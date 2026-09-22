@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [develop, main]
+    # ⚠️ `edited`를 넣는다. 기본값은 opened·synchronize·reopened뿐이라, **base를 바꾼 PR은
+    #    CI가 안 돈다** — base 변경은 `edited`로 온다. 실제로 팀장·사원 대시보드 PR이
+    #    다른 feature 브랜치를 base로 열려 CI가 한 번도 안 돌았고, develop으로 고친 뒤에도
+    #    새 푸시가 있기 전까지 검사 없이 머지 가능해 보였다.
+    #    `edited`는 제목·본문 수정에도 오지만, 그 경우 한 번 더 도는 게 안 도는 것보다 낫다.
+    types: [opened, synchronize, reopened, edited]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+      - run: npm run test -- --ci --passWithNoTests
+      - run: npm run build

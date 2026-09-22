@@ -1,0 +1,301 @@
+/**
+ * react-big-calendar 기본 CSS(`rbc-*`)를 Z 디자인 토큰(CSS 변수)에 맞춘 오버라이드.
+ * `personal-calendar.css`(월간 뷰)와 짝이지만, 이 화면은 `work_week`(시간대) 뷰라 다른 클래스를 쓴다.
+ */
+
+/*
+  ⚠️ **카드 한 장이다**(2026-08-11). 툴바는 격자 위에 떠 있고 격자만 테두리를 두르고 있어서,
+     개인 캘린더(카드 안에 머리+격자)와 생김새가 갈렸다 — 테두리·모서리·그림자를 뿌리로
+     옮겨 머리와 격자를 한 장에 담는다. 라이브러리 마크업은 그대로다.
+*/
+.rbc-calendar {
+  color: var(--foreground);
+  font-family: var(--font-sans);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-2xl);
+  background-color: var(--card);
+  overflow: hidden;
+  box-shadow:
+    0 1px 2px color-mix(in oklch, var(--foreground) 4%, transparent),
+    0 1px 3px color-mix(in oklch, var(--foreground) 3%, transparent);
+}
+
+.dark .rbc-calendar {
+  box-shadow: none;
+}
+
+/*
+  ⚠️ **카드처럼 보이게 한다**(2026-08-11). 개인 캘린더(`/app/calendar`)는 카드 한 장 안에
+     격자가 들어 있는데 이 화면만 표처럼 각져 있어서, 같은 앱의 같은 종류 화면인데도
+     느낌이 갈렸다 — 라이브러리는 그대로 두고 **면·모서리·그림자만** 카드 규격으로 맞춘다.
+  ⚠️ 그림자 값은 셸의 카드 규칙(`.app-shell .bg-card`)과 같은 식이다. 다크에서는 안 건다.
+*/
+/* 격자 자체는 이제 테두리를 안 두른다 — 카드가 뿌리에 있다 */
+.rbc-time-view {
+  border: 0;
+  border-radius: 0;
+  background-color: var(--card);
+}
+
+/*
+  ⚠️ **항상 내부 스크롤이다**(2026-08-14, 24시간 확장 — 이전엔 "시간 슬롯 수 × 칸 높이"가
+     보이는 박스 높이와 정확히 같아서 스크롤 자체가 필요 없었다). 그리드는 이제 00:00~24:00를
+     다 그리지만 보이는 박스(`calendar-height.ts`)는 예전 10시간 치 높이로 고정해 뒀으므로
+     내용이 그 안에 다 안 들어가고, 여기서 `auto`로 남는 시간대를 스크롤로 본다.
+  (RBC가 인라인으로 `overflow-y`를 얹으므로 `!important`로 이긴다.)
+*/
+.rbc-time-content {
+  overflow-y: auto !important;
+}
+
+/*
+  ⚠️ **칸 높이를 고정한다**(2026-08-14, 24시간 확장). RBC 기본값은 `flex: 1`이라 슬롯 수가
+     늘어나면(24시간 = 48칸) 남는 높이를 그 수만큼 나눠 칸이 찌그러진다 — 그러면 스크롤이
+     아니라 칸이 작아지는 쪽으로 반응해 버려서 내부 스크롤 자체가 안 생긴다. 30분 칸을
+     `calendar-height.ts`의 `HALF_HOUR_SLOT_HEIGHT_PX`(40px)로 고정해야 24시간 전체가
+     제 높이만큼 쌓여 보이는 박스를 넘치고, 그 넘친 만큼만 내부 스크롤이 생긴다.
+  ⚠️ `.rbc-time-column`은 시간 눈금(`.rbc-time-gutter`)과 날짜 칸(`.rbc-day-slot`) 둘 다에
+     붙는 클래스라(`react-big-calendar` 라이브러리 자체 마크업) 이 선택자 하나로 왼쪽 숫자와
+     오른쪽 칸의 줄이 같이 맞는다.
+  ⚠️ 다른 규칙과 달리 `!important` 없이 두면(예전 8~18시 10시간 구간에서는 우연히 문제가 안
+     드러났다) 이 파일의 다른 모든 override와 마찬가지로 RBC 인라인/기본 스타일에 로드 순서로
+     밀릴 수 있다 — 이 파일의 기존 관례(다른 모든 규칙이 `!important`인 이유)를 그대로 따른다.
+*/
+.rbc-time-column .rbc-timeslot-group {
+  flex: 0 0 80px !important;
+}
+
+.rbc-time-column .rbc-time-slot {
+  flex: 0 0 40px !important;
+}
+
+/*
+  ⚠️ **선 색을 남김없이 토큰으로 바꾼다**(2026-08-11). 라이브러리 기본 CSS가 곳곳에
+     `#DDD`를 직접 박아 두는데, 라이트에서는 우리 보더색과 비슷해 티가 안 나지만
+     **다크에서는 흰 줄로 번쩍인다** — 하루 종일 세로줄만 밝게 떠 있었다.
+  ⚠️ 열 사이 세로선은 `.rbc-timeslot-group`·`.rbc-events-container`가 그린다(칸 자체가 아니다).
+*/
+.rbc-header,
+.rbc-time-header-content,
+.rbc-time-content,
+.rbc-time-gutter,
+.rbc-time-header.rbc-overflowing,
+.rbc-timeslot-group,
+.rbc-day-slot .rbc-events-container,
+.rbc-time-content > * + * {
+  border-color: var(--border) !important;
+}
+
+/*
+  ⚠️ **요일 줄과 격자 사이는 선 하나다**(2026-08-11). RBC 기본값이 요일 칸에 아래선 1px,
+     본문 위에 **2px**를 따로 그어서 경계가 3px 굵은 이중선으로 보였다(시간 눈금 칸에서는
+     2px만 보여 좌우 굵기까지 달랐다) — 요일 쪽 선을 지우고 본문 위 선 하나만 1px로 남긴다.
+*/
+.rbc-header {
+  border-bottom: 0 !important;
+}
+
+.rbc-time-content {
+  border-top: 1px solid var(--border) !important;
+}
+
+/*
+  ⚠️ 요일 줄에 **회색 띠를 깔지 않는다**(2026-08-11). 표 머리처럼 보여서 개인 캘린더의
+     요일 줄(민 바탕 + 흐린 글자)과 달랐다 — 나누는 일은 아래 선 하나가 한다(§DESIGN 2).
+*/
+.rbc-header {
+  background-color: transparent;
+  color: var(--muted-foreground);
+  padding: 10px 0;
+  font-size: 12px;
+  line-height: 16px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  오늘 요일 — 개인 캘린더가 **오늘 날짜에 먹색 알약**을 씌우는 것과 같은 결이다.
+  띠를 깔면 표 머리로 돌아가므로, 글자만 진하게 세운다.
+*/
+.rbc-header.rbc-today {
+  color: var(--foreground);
+  font-weight: 600;
+}
+
+/* 시간 눈금 — 숫자는 자릿수가 흔들리지 않게 */
+.rbc-time-gutter .rbc-label {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+  주의: RBC는 `.rbc-time-header-content` 안에 요일 행(`.rbc-row.rbc-time-header-cell`) 말고도
+  종일(all-day) 이벤트용 행(`.rbc-allday-cell`)을 항상 하나 더 만든다. 이 화면엔 종일 예약이
+  없는데도 그 빈 행이 계속 자리를 차지해서 "8/3" 같은 날짜가 요일 행 + 빈 행 두 줄로
+  갈라진 것처럼 보였다 — 아예 감춰서 요일 행 하나만 남긴다(라이브러리 코드는 안 건드리고
+  스타일로만 없앤다).
+*/
+.rbc-allday-cell {
+  display: none;
+}
+
+/*
+  RBC는 커스텀 `event` 컴포넌트를 써도 그 앞에 자체 시간 라벨(`.rbc-event-label`)을 항상 하나
+  더 그린다 — `RoomReservationEvent`가 이미 자기 시간을 표시하므로 이 라벨은 중복이라 감춘다.
+*/
+.rbc-event-label {
+  display: none;
+}
+
+/*
+  주의: 정시(그룹)와 반시(슬롯) 경계선을 **다르게** 그린다 — `step=30, timeslots=2`라
+  `.rbc-timeslot-group` 하나가 정시 1시간, 그 안의 `.rbc-time-slot` 2개가 각각 30분이다.
+  전에는 슬롯 보더를 통째로 지워서 시간 눈금(왼쪽 거터)과 칸 사이가 안 맞아 보였다 —
+  30분 눈금도 옅은 점선으로 남겨야 왼쪽 숫자와 오른쪽 칸이 줄이 맞아떨어진다.
+*/
+.rbc-timeslot-group {
+  border-bottom: 1px solid var(--border) !important;
+}
+
+/*
+  ⚠️ 마지막 시간대는 아랫선을 안 긋는다 — 카드 테두리와 겹쳐 바닥만 2px로 굵어진다.
+  ⚠️ `:last-child`도 `:last-of-type`도 못 잡는다 — 칸 맨 끝에 예약 막대를 담는
+     `.rbc-events-container`가 하나 더 붙는데 그것도 `div`라, 둘 다 그 칸을 가리킨다.
+     **뒤에 시간대가 더 없는 것**을 직접 고른다.
+*/
+.rbc-timeslot-group:not(:has(~ .rbc-timeslot-group)) {
+  border-bottom: 0 !important;
+}
+
+.rbc-time-slot {
+  z-index: 9;
+  color: var(--muted-foreground);
+  border-top: none;
+}
+
+/*
+  빈 슬롯 클릭 = 예약 모달을 연다 — 클릭 가능한 영역이라는 걸 커서·hover 배경으로 알린다.
+  주의: 예약이 이미 있는 칸도 이 클래스를 그대로 갖고 있지만, 그 위엔 `RoomReservationEvent`가
+  덮어 그려져서(§Mock 격리막) 실제로는 그 막대의 클릭 핸들러가 우선한다 — 빈 칸에서만
+  보이는 hover라 헷갈리지 않는다.
+*/
+.rbc-day-slot .rbc-time-slot {
+  cursor: pointer;
+  transition: background-color 100ms;
+}
+
+/*
+  주의: 6% → 10%로 올렸다(2026-08-10) — 6%는 밝은 화면에서 커서만 바뀌고 배경 변화가 거의
+     안 보인다는 피드백이 있었다. 굵은 색 대신 그대로 `--foreground` 믹스 비율만 올려서
+     토큰은 그대로 유지한다(§디자인 토큰: 하드코딩 금지).
+*/
+.rbc-day-slot .rbc-time-slot:hover {
+  background-color: color-mix(in srgb, var(--foreground) 10%, transparent);
+}
+
+.rbc-day-slot .rbc-time-slot {
+  border-top: 1px dashed color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.rbc-day-slot .rbc-timeslot-group > .rbc-time-slot:first-child {
+  border-top: none;
+}
+
+/* 셀 배경이 투명이면 뒤의 점 그리드가 비쳐 보인다 — 카드처럼 떠 있는 면으로 채운다. */
+.rbc-time-content > .rbc-day-slot {
+  background-color: var(--card);
+}
+
+/*
+  오늘 칸 — 카드 면 위에 먹색 3%. 이보다 진하면 예약 막대보다 바탕이 먼저 읽히고,
+  이보다 옅으면 어제·내일과 구분이 안 된다.
+*/
+/*
+  ⚠️ 요일 머리는 뺀다(`:not(.rbc-header)`). `.rbc-today`는 머리 칸에도 붙어 있어서, 그냥 두면
+     위에서 "띠를 깔지 않는다"고 정한 머리에 3% 띠가 도로 깔린다.
+*/
+.rbc-today:not(.rbc-header) {
+  background-color: color-mix(in srgb, var(--foreground) 3%, var(--card));
+}
+
+/*
+  예약 막대는 안쪽 컴포넌트(`RoomReservationEvent`)가 색·패딩·글자를 전부 그린다 —
+  RBC 기본 배경·테두리는 지워서 우리 색만 보이게 한다(개인 캘린더는 반대로 글자를 지웠다,
+  거긴 오른쪽 상세조회 패널이 있어서고 여긴 없어서 막대 안에서 바로 읽혀야 한다).
+  주의: `!important` — RBC가 `.rbc-event`에 인라인 스타일(테두리·배경)을 직접 얹어서 일반
+     클래스 규칙보다 우선순위가 높다. 그대로 두면 RBC 기본 테두리 + `RoomReservationEvent`의
+     `border-l-2` 액센트 테두리가 겹쳐 이중 테두리로 보인다 — 바깥(RBC) 쪽을 지우고
+     안쪽(우리) 테두리 하나만 남긴다.
+*/
+.rbc-event {
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+}
+
+/*
+  주의: RBC 기본 CSS는 `.rbc-day-slot .rbc-events-container`에 `margin-right: 10px`를 고정으로
+  건다(라이브러리 자체 스타일, 인라인 아님) — 그만큼 이벤트 막대가 칸 오른쪽 테두리에 못 닿고
+  항상 10px 틈이 남는다. 배율(줌)에 따라 칸 너비가 달라지면서 그 틈이 더 도드라져 보인
+  "줄이 안 맞는" 현상의 실제 원인이 이거다 — 컨테이너를 칸 전체 폭으로 채워서 막대 오른쪽
+  끝이 세로 구분선과 겹치게 한다.
+  ⚠️ **`z-index`도 여기서 명시한다**(2026-08-15 버그 수정). `.rbc-time-slot`은 빈 칸 호버
+     효과를 위해 `z-index: 9`가 붙어 있는데(#258), `.rbc-events-container`는 RBC 기본값이
+     `position: absolute`에 `z-index: auto`라 같은 스택 맥락(`.rbc-day-slot`, position:
+     relative)에서 값 있는 z-index보다 **아래**로 페인트된다 — 이미 있는 예약을 클릭해도
+     실제로는 그 위에 얹힌 빈 칸(`.rbc-time-slot`)이 클릭을 가로채, "예약 상세 조회" 대신
+     "새 회의 예약" 모달이 열렸다(`weekly-room-calendar.tsx`의 `onSelectEvent`가 발화되기도
+     전에 `.rbc-time-slot`이 클릭을 먼저 삼켰다). 빈 칸(9)보다 높여서 막대가 항상 클릭
+     가능한 맨 위에 오게 한다.
+*/
+.rbc-day-slot .rbc-events-container {
+  right: 0;
+  margin-right: 0;
+  z-index: 20;
+  /*
+    ⚠️ **컨테이너 자체는 클릭을 안 받는다**(2026-08-15 추가 수정). 이 컨테이너는 그 날 칸
+       전체 높이를 차지하는 하나짜리 `div`다(예약이 몇 개든, 심지어 0개여도) — 위에서
+       z-index만 올렸더니 예약이 없는 빈 시간대까지 이 컨테이너가 뒤덮어서, 빈 칸의
+       `.rbc-time-slot:hover`가 아예 발화하지 않았다(마우스 아래 최상단 요소가 항상 이
+       빈 컨테이너였다 — #571). 컨테이너는 통과시키고, 실제 예약 막대(`.rbc-event`)만
+       도로 받게 한다.
+  */
+  pointer-events: none;
+}
+
+.rbc-day-slot .rbc-events-container .rbc-event {
+  pointer-events: auto;
+}
+
+.rbc-event.rbc-selected {
+  outline: 2px solid var(--ring);
+  outline-offset: 1px;
+}
+
+/*
+  지금 시각 — **먹색이다**(2026-08-11). 빨강은 이 앱에서 잘못됐다는 뜻이라(§DESIGN 5),
+  그냥 지금이 몇 시인지 알려 주는 선에 쓰면 예약이 잘못된 것처럼 읽힌다.
+  왼쪽 끝에 점을 찍어 눈금과 이어지는 시각임을 알린다.
+*/
+.rbc-current-time-indicator {
+  height: 2px;
+  border-radius: 9999px;
+  background-color: var(--foreground);
+}
+
+/*
+  왼쪽 끝 점 — **바탕색 링을 두른다.** 점이 격자선 위에 바로 얹히면 선과 뭉쳐 보이는데,
+  카드 면 색으로 한 겹 둘러 주면 격자에서 살짝 떠 보여 "지금"이 또렷해진다.
+*/
+.rbc-current-time-indicator::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 9999px;
+  background-color: var(--foreground);
+  box-shadow: 0 0 0 3px var(--card);
+  transform: translate(-4px, -50%);
+}
