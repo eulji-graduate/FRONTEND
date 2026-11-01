@@ -3,8 +3,10 @@ import { headers } from "next/headers";
 import { AUTHORITY, type Authority } from "@/constants/authority";
 import { getMe } from "@/features/auth/me";
 import { PATHNAME_HEADER } from "@/lib/pathname-header";
-import type { Actor } from "@/lib/permission";
+import { type Actor, canGrantAdmin } from "@/lib/permission";
 import { isMock } from "@/mocks/config";
+
+import { readPreview } from "./preview";
 
 /**
  * 지금 보고 있는 사람 — **세션이 붙기 전까지 이 파일 하나가 목이다.**
@@ -57,25 +59,6 @@ const MOCK_PEOPLE: Record<Authority, { id: number; name: string; teamName?: stri
   [AUTHORITY.SYSTEM]: { id: 0, name: "Z 운영자" },
 };
 
-/**
- * 목 전용 **미리보기 스위치** — `?as=member`처럼 붙이면 그 역할로 화면을 본다.
- *
- * ⚠️ 주소로만 역할을 정하면 `/owner`는 언제나 대표라, **막히는 화면(403)을 확인할 길이 없다** —
- *    가드가 실제로 도는지 눈으로 보려면 다른 사람으로 그 주소를 열어 봐야 한다.
- * ⚠️ 로그인이 붙으면 이 분기 자체가 안 돈다(`isMock`) — 세션이 사람을 정한다.
- */
-function previewRoleFrom(search: string): Authority | null {
-  const value = new URLSearchParams(search).get("as")?.toUpperCase();
-  if (!value) return null;
-  return AUTHORITY_BY_NAME[value] ?? null;
-}
-
-const AUTHORITY_BY_NAME: Record<string, Authority> = {
-  OWNER: AUTHORITY.OWNER,
-  LEADER: AUTHORITY.LEADER,
-  MEMBER: AUTHORITY.MEMBER,
-};
-
 function mockRoleFor(pathname: string): Authority {
   if (pathname === "/team" || pathname.startsWith("/team/")) return AUTHORITY.LEADER;
   if (pathname === "/my" || pathname.startsWith("/my/")) return AUTHORITY.MEMBER;
@@ -91,14 +74,17 @@ export async function getViewer(): Promise<Viewer> {
     */
     const url = (await headers()).get(PATHNAME_HEADER) ?? "";
     const [pathname = "", search = ""] = url.split("?");
-    const role = previewRoleFrom(search) ?? mockRoleFor(pathname);
+    /* ⚠️ 미리보기 스위치(`?as=`·`&admin=1`)는 `preview.ts`가 읽는다 — 읽기만 하고 판정은 안 한다 */
+    const preview = readPreview(search);
+    const role = preview.role ?? mockRoleFor(pathname);
     const person = MOCK_PEOPLE[role];
 
     return {
       id: person.id,
       name: person.name,
       role,
-      isAdmin: false,
+      /* ⚠️ 겸직을 얹을 수 있는 권한(팀장·사원)에만 켠다 — Owner에는 `canGrantAdmin`이 막는다 */
+      isAdmin: preview.isAdmin && canGrantAdmin({ role }),
       teamName: person.teamName,
       companyId: MOCK_COMPANY_ID,
     };
