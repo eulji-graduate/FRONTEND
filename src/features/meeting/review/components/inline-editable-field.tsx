@@ -107,8 +107,8 @@ export function InlineEditableField({
     <button
       type="button"
       onClick={startEditing}
-      aria-label={`${ariaLabel} 수정`}
-      aria-invalid={isInvalid || undefined}
+      // ⚠️ 버튼은 `aria-invalid`를 못 가진다(jsx-a11y) — 비어 있다는 사실은 이름에 싣는다
+      aria-label={isInvalid ? `${ariaLabel} 수정 (입력 필요)` : `${ariaLabel} 수정`}
       // ⚠️ `inline-flex`(아니라 `flex`)라서 글자 길이만큼만 넓어진다 — 연필이 칸 오른쪽 끝이
       //    아니라 글자 바로 옆에 붙는다. 넘치면 `max-w-full`이 잘라 `truncate`가 말줄임한다.
       className={cn(
