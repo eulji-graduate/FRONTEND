@@ -1,4 +1,6 @@
 import {
+  addDaysIso,
+  firstOfMonthIso,
   formatDate,
   formatDateWithYear,
   formatElapsed,
@@ -7,6 +9,56 @@ import {
   formatYearMonthDay,
   isReadableDate,
 } from "./date";
+
+describe("addDaysIso", () => {
+  it("일수를 더하고 뺀다", () => {
+    expect(addDaysIso("2026-11-01", 3)).toBe("2026-11-04");
+    expect(addDaysIso("2026-11-01", -1)).toBe("2026-10-31");
+  });
+
+  it("달과 해의 경계를 넘는다", () => {
+    expect(addDaysIso("2026-12-30", 3)).toBe("2027-01-02");
+    expect(addDaysIso("2027-01-02", -3)).toBe("2026-12-30");
+  });
+
+  it("윤일을 센다", () => {
+    expect(addDaysIso("2028-02-28", 1)).toBe("2028-02-29");
+    expect(addDaysIso("2027-02-28", 1)).toBe("2027-03-01");
+  });
+
+  it("0이면 그대로다", () => {
+    expect(addDaysIso("2026-11-01", 0)).toBe("2026-11-01");
+  });
+
+  it("읽을 수 없는 날짜는 원문을 그대로 돌려준다", () => {
+    expect(addDaysIso("2026-02-30", 1)).toBe("2026-02-30");
+    expect(addDaysIso("내일", 1)).toBe("내일");
+  });
+});
+
+describe("firstOfMonthIso", () => {
+  it("같은 달 1일이다", () => {
+    expect(firstOfMonthIso("2026-11-17", 0)).toBe("2026-11-01");
+  });
+
+  it("다음 달과 이전 달의 1일이다", () => {
+    expect(firstOfMonthIso("2026-11-17", 1)).toBe("2026-12-01");
+    expect(firstOfMonthIso("2026-11-17", -5)).toBe("2026-06-01");
+  });
+
+  it("해를 넘기는 달 계산을 접는다", () => {
+    expect(firstOfMonthIso("2026-12-31", 1)).toBe("2027-01-01");
+    expect(firstOfMonthIso("2027-01-15", -1)).toBe("2026-12-01");
+  });
+
+  it("31일에서 한 달을 더해도 날짜가 굴러가지 않는다", () => {
+    expect(firstOfMonthIso("2026-01-31", 1)).toBe("2026-02-01");
+  });
+
+  it("읽을 수 없는 날짜는 원문을 그대로 돌려준다", () => {
+    expect(firstOfMonthIso("2026-13-01", 1)).toBe("2026-13-01");
+  });
+});
 
 /**
  * ⚠️ `todayIso()`는 테스트하지 않는다 — 실제 시계를 읽는 함수라 시각을 고정하지 않으면
