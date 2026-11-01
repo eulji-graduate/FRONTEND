@@ -42,6 +42,12 @@ const config: Config = {
   roots: ["<rootDir>/src"],
   // Playwright 스펙은 e2e/ 에만 둔다 (CONVENTIONS §18)
   testPathIgnorePatterns: ["<rootDir>/.next/", "<rootDir>/node_modules/", "<rootDir>/e2e/"],
+  /*
+    ⚠️ 기본 5초는 로컬 PC에서 전체를 병렬로 돌릴 때 모자란다(#4). `user-event`로 폼을 끝까지
+       채우는 테스트가 부하에 밀려 **실행마다 다른 테스트가** 타임아웃으로 떨어지고, 단독으로
+       돌리면 통과한다 — 코드 문제가 아니라 시간 상한 문제라 상한만 올린다.
+  */
+  testTimeout: 20_000,
 };
 
 export default createJestConfig(config);

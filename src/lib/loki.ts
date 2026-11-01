@@ -6,8 +6,8 @@ import "server-only";
  * ⚠️ **로그 전송 실패가 요청을 깨면 안 된다.** 모니터링 서버가 잠깐 죽어도 사용자가 보는 화면은
  *    멀쩡해야 한다 — 그래서 실패를 던지지 않고 조용히 삼킨다(§정직성: 로그는 부가 기능이지
  *    핵심 경로가 아니다).
- * ⚠️ **프라이빗 IP로 붙는다.** 같은 VPC 안이라 퍼블릭 IP로 나갔다 들어오면 보안그룹의
- *    SG 참조 규칙이 매칭 안 될 수 있다(2026-08-13 실측 확인) — 반드시 프라이빗 IP를 쓴다.
+ * ⚠️ **`LOKI_URL`이 없으면 보내지 않는다**(로컬 전용 전환, #4). 예전엔 배포 VPC의 사설 IP가
+ *    기본값이라, 로컬에서는 닿지 않는 주소로 매번 2초짜리 요청이 나갔다.
  * ⚠️ `LOKI_URL`은 서버 전용이라 `NEXT_PUBLIC_`을 안 붙인다 — 브라우저에 나갈 값이 아니다.
  * ⚠️ **`after()`로 응답 뒤까지 살려 둔다.** 서버리스 실행 환경은 응답을 보내는 순간 함수를
  *    끊을 수 있어, `await` 없이 던진 fetch가 중간에 잘릴 수 있다 — Next의 `after`가 요청
@@ -18,8 +18,6 @@ import "server-only";
  * ⚠️ **HTTP 4xx/5xx도 실패로 본다.** `fetch`는 상태 코드가 나빠도 거부하지 않으므로
  *    `response.ok`를 직접 확인해 catch로 흘려 보낸다 — 그래야 조용한 유실을 안 만든다.
  */
-const LOKI_URL = process.env.LOKI_URL ?? "http://172.31.41.26:3100";
-
 /**
  * 한 번의 push에 허용하는 상한.
  *
@@ -44,6 +42,9 @@ export function pushLokiLog(
   message: string,
   meta?: Record<string, unknown>,
 ): void {
+  const lokiUrl = process.env.LOKI_URL;
+  if (!lokiUrl) return;
+
   const nowNs = `${Date.now()}000000`;
   const line = meta ? `${message} ${JSON.stringify(meta)}` : message;
 
@@ -56,7 +57,7 @@ export function pushLokiLog(
     ],
   };
 
-  const send = fetch(`${LOKI_URL}/loki/api/v1/push`, {
+  const send = fetch(`${lokiUrl}/loki/api/v1/push`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
