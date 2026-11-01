@@ -1,5 +1,7 @@
 import "server-only";
 
+import { firstOfMonthIso, todayIso } from "@/lib/date";
+
 import {
   type BillingOverview,
   PAYMENT_STATUS,
@@ -22,80 +24,87 @@ import { PLAN } from "./types";
  * ⚠️ **화면에는 더미라고 밝힌다**(`BillingView`) — 베타 서버라는 사실을 감추지 않는다(§정직성).
  */
 
-/** 더미 — 12명이 Team을 쓰는 회사 */
-const MOCK: BillingOverview = {
-  subscription: {
-    planCode: PLAN.TEAM,
-    planName: "Team",
-    status: SUBSCRIPTION_STATUS.ACTIVE,
-    /*
+/**
+ * 더미 — 12명이 Team을 쓰는 회사.
+ *
+ * ⚠️ **날짜는 `today`에서 계산한다.** 8월로 박아 두면 시연일이 지난 뒤 구독 주기와 결제 내역이
+ *    몇 달 전 것으로 보인다. 주기는 이번 달 1일부터 다음 달 1일까지, 결제는 그 주기들의 1일이다.
+ */
+function buildMock(today: string): BillingOverview {
+  return {
+    subscription: {
+      planCode: PLAN.TEAM,
+      planName: "Team",
+      status: SUBSCRIPTION_STATUS.ACTIVE,
+      /*
       ⚠️ `currentPeriodEnd`는 **갱신일과 같은 날**이다(그날 다음 주기가 시작된다).
          하루 앞으로 적어 두면 일할계산의 주기 일수가 하루 모자라 금액이 어긋난다.
     */
-    currentPeriodStart: "2026-08-01",
-    currentPeriodEnd: "2026-09-01",
-    nextBillingDate: "2026-09-01",
-    estimatedAmount: 165_000,
-    carriedOverageAmount: 0,
-    /*
+      currentPeriodStart: firstOfMonthIso(today, 0),
+      currentPeriodEnd: firstOfMonthIso(today, 1),
+      nextBillingDate: firstOfMonthIso(today, 1),
+      estimatedAmount: 165_000,
+      carriedOverageAmount: 0,
+      /*
       ⚠️ **청구 지표는 AI 사용량과 저장 공간 둘뿐이다.** 회의 건수는 참고용으로만 둔다 —
          과금과 무관한 숫자를 같은 자리에 크게 놓으면 무엇 때문에 돈이 나가는지 흐려진다.
       ⚠️ 저장 공간을 **음성과 자막으로 나눠** 담는다. 둘 다 과금 대상이고, 지울 때
          음성은 권장·자막은 비권장이라 화면에서 갈라 보여야 한다(팀 결정).
     */
-    usage: {
-      // ⚠️ **스토리지는 쌓인 총량**이다. 지난 달까지 쌓인 게 대부분이다.
-      tokens: 186_000,
-      voiceStorageGb: 34.9,
-      sttStorageGb: 6.8,
-      meetingCount: 6,
+      usage: {
+        // ⚠️ **스토리지는 쌓인 총량**이다. 지난 달까지 쌓인 게 대부분이다.
+        tokens: 186_000,
+        voiceStorageGb: 34.9,
+        sttStorageGb: 6.8,
+        meetingCount: 6,
+      },
     },
-  },
-  method: { id: "pm_1", brand: "VISA", last4: "4242", expiry: "09/27" },
-  payments: [
-    {
-      id: "pay_7",
-      paidAt: "2026-08-01",
-      planName: "Team",
-      overageAmount: 0,
-      amount: 165_000,
-      status: PAYMENT_STATUS.PAID,
-    },
-    {
-      id: "pay_6",
-      paidAt: "2026-07-01",
-      planName: "Team",
-      overageAmount: 0,
-      amount: 165_000,
-      status: PAYMENT_STATUS.PAID,
-    },
-    {
-      id: "pay_5",
-      paidAt: "2026-06-01",
-      planName: "Team",
-      overageAmount: 0,
-      amount: 165_000,
-      status: PAYMENT_STATUS.PAID,
-    },
-    {
-      id: "pay_4",
-      paidAt: "2026-05-01",
-      planName: "Team",
-      overageAmount: 0,
-      amount: 165_000,
-      status: PAYMENT_STATUS.PAID,
-    },
-    {
-      id: "pay_3",
-      paidAt: "2026-04-01",
-      planName: "Team",
-      // 초과가 난 달 — 기본료에 얹혀 한 번에 청구됐다
-      overageAmount: 22_400,
-      amount: 187_400,
-      status: PAYMENT_STATUS.PAID,
-    },
-  ],
-};
+    method: { id: "pm_1", brand: "VISA", last4: "4242", expiry: "09/27" },
+    payments: [
+      {
+        id: "pay_7",
+        paidAt: firstOfMonthIso(today, 0),
+        planName: "Team",
+        overageAmount: 0,
+        amount: 165_000,
+        status: PAYMENT_STATUS.PAID,
+      },
+      {
+        id: "pay_6",
+        paidAt: firstOfMonthIso(today, -1),
+        planName: "Team",
+        overageAmount: 0,
+        amount: 165_000,
+        status: PAYMENT_STATUS.PAID,
+      },
+      {
+        id: "pay_5",
+        paidAt: firstOfMonthIso(today, -2),
+        planName: "Team",
+        overageAmount: 0,
+        amount: 165_000,
+        status: PAYMENT_STATUS.PAID,
+      },
+      {
+        id: "pay_4",
+        paidAt: firstOfMonthIso(today, -3),
+        planName: "Team",
+        overageAmount: 0,
+        amount: 165_000,
+        status: PAYMENT_STATUS.PAID,
+      },
+      {
+        id: "pay_3",
+        paidAt: firstOfMonthIso(today, -4),
+        planName: "Team",
+        // 초과가 난 달 — 기본료에 얹혀 한 번에 청구됐다
+        overageAmount: 22_400,
+        amount: 187_400,
+        status: PAYMENT_STATUS.PAID,
+      },
+    ],
+  };
+}
 
 /**
  * 온보딩 4단계·구독 재개 화면(`/subscription`)이 보는 구독 — **아직 결제 전**이다.
@@ -104,18 +113,20 @@ const MOCK: BillingOverview = {
  *    온보딩에서 열면 "변경 사항 없음 · ₩0"이 떠서 결제를 할 수가 없다.
  * ⚠️ 사용량이 전부 0이다. 아직 아무것도 안 썼다 — 결제 화면은 **포함량만** 보여준다.
  */
-const MOCK_PENDING: Subscription = {
-  ...MOCK.subscription,
-  status: SUBSCRIPTION_STATUS.UNPAID,
-  nextBillingDate: null,
-  estimatedAmount: 0,
-  usage: {
-    tokens: 0,
-    voiceStorageGb: 0,
-    sttStorageGb: 0,
-    meetingCount: 0,
-  },
-};
+function buildPending(today: string): Subscription {
+  return {
+    ...buildMock(today).subscription,
+    status: SUBSCRIPTION_STATUS.UNPAID,
+    nextBillingDate: null,
+    estimatedAmount: 0,
+    usage: {
+      tokens: 0,
+      voiceStorageGb: 0,
+      sttStorageGb: 0,
+      meetingCount: 0,
+    },
+  };
+}
 
 /**
  * 요금 설정 — **BE가 내려주는 값**이다(팀 확정: 하드코딩 금지).
@@ -145,12 +156,12 @@ export async function getBillingConfig(): Promise<BillingConfig> {
  * 온보딩 4단계·구독 재개 화면이 보는 구독 — **아직 결제 전**이다.
  */
 export async function getOnboardingSubscription(): Promise<Subscription> {
-  return MOCK_PENDING;
+  return buildPending(todayIso());
 }
 
 /**
  * 구독 현황 화면(`/manage/billing`) 한 벌.
  */
 export async function getBillingOverview(): Promise<BillingOverview> {
-  return MOCK;
+  return buildMock(todayIso());
 }

@@ -51,6 +51,42 @@ export function isReadableDate(iso: string): boolean {
   return parseIsoDate(iso) !== null;
 }
 
+/** UTC 기준 날짜를 `YYYY-MM-DD`로 — `toISOString`처럼 시각까지 달고 다니지 않게 조각을 직접 잇는다 */
+function toIsoDate(date: Date): string {
+  const y = String(date.getUTCFullYear()).padStart(4, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/**
+ * `iso`에 일수를 더한다. 음수면 뺀다.
+ *
+ * ⚠️ 목 데이터가 "오늘 기준 N일 뒤"를 만들 때 쓴다. 하드코딩한 날짜는 시연일이 지나면 낡는다.
+ * ⚠️ 읽을 수 없는 날짜면 **원문을 그대로** 돌려준다 — `formatDate`와 같은 약속이다.
+ *    없는 날짜를 지어내느니 부르는 쪽이 이상한 값을 그대로 보게 두는 게 낫다.
+ */
+export function addDaysIso(iso: string, days: number): string {
+  const d = parseIsoDate(iso);
+  if (!d) return iso;
+
+  return toIsoDate(new Date(Date.UTC(d.y, d.m - 1, d.d + days)));
+}
+
+/**
+ * `iso`가 속한 달에서 `offsetMonths`달 뒤(음수면 앞)의 **1일**.
+ *
+ * ⚠️ 결제 주기처럼 달 단위로 끊기는 값에 쓴다. 31일에 한 달을 더하면 날짜가 굴러가는 문제를
+ *    1일로 고정해 피한다. `Date.UTC`가 달 넘침(13월 → 이듬해 1월)을 알아서 접는다.
+ * ⚠️ 읽을 수 없는 날짜면 **원문을 그대로** 돌려준다.
+ */
+export function firstOfMonthIso(iso: string, offsetMonths: number): string {
+  const d = parseIsoDate(iso);
+  if (!d) return iso;
+
+  return toIsoDate(new Date(Date.UTC(d.y, d.m - 1 + offsetMonths, 1)));
+}
+
 /**
  * 두 날짜 사이의 **일수**. `to`가 `from`보다 앞이면 음수.
  *
