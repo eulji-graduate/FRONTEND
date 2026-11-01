@@ -14,11 +14,23 @@ describe("pushLokiLog", () => {
 
   beforeEach(() => {
     afterMock.mockClear();
+    process.env.LOKI_URL = "http://loki.test:3100";
   });
 
   afterEach(() => {
     global.fetch = originalFetch;
+    delete process.env.LOKI_URL;
     jest.restoreAllMocks();
+  });
+
+  it("`LOKI_URL`이 없으면 보내지 않는다 — 로컬에서 닿지 않는 주소를 두드리지 않는다", () => {
+    delete process.env.LOKI_URL;
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    pushLokiLog("error", "boom");
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("`after()`로 응답 뒤까지 살려 둔다 — 서버리스에서 잘리지 않는다", async () => {
