@@ -1,0 +1,69 @@
+jest.mock("../manage-actions", () => ({
+  approveHandoverAction: jest.fn(),
+  rejectHandoverAction: jest.fn(),
+}));
+
+import { render, screen } from "@testing-library/react";
+
+import { AUTHORITY } from "@/constants/authority";
+import { HANDOVER_TYPE } from "@/constants/handover";
+
+import type { PendingHandover } from "../manage-types";
+import { HandoverApprovalCard } from "./handover-approval-card";
+
+const BASE: PendingHandover = {
+  id: "10",
+  type: HANDOVER_TYPE.VACATION,
+  period: { from: "2026-11-05", to: "2026-11-09" },
+  actionCount: 3,
+  midApproval: null,
+  requesterAuthority: AUTHORITY.MEMBER,
+};
+
+function renderCard(handover: PendingHandover, isRequesterLeader = false) {
+  render(
+    <HandoverApprovalCard
+      memberId={3}
+      memberName="이하윤"
+      memberAuthority={isRequesterLeader ? AUTHORITY.LEADER : AUTHORITY.MEMBER}
+      handover={handover}
+      canApprove
+      isRequesterLeader={isRequesterLeader}
+    />,
+  );
+}
+
+describe("HandoverApprovalCard — 중간 승인 전 최종 승인 잠금", () => {
+  it("일반 팀원 신청이 중간 승인 전이면 최종 승인을 잠그고 그 이유 문장에 잇는다", () => {
+    // Arrange
+    renderCard(BASE);
+
+    // Act
+    const approve = screen.getByRole("button", { name: "최종 승인" });
+
+    // Assert
+    expect(approve).toBeDisabled();
+    expect(approve).toHaveAccessibleDescription(/아직 팀장의 중간 승인을 기다리고 있습니다/);
+  });
+
+  it("중간 승인 전이어도 반려는 열어 둔다", () => {
+    renderCard(BASE);
+
+    expect(screen.getByRole("button", { name: "반려" })).toBeEnabled();
+  });
+
+  it("중간 승인이 끝나면 최종 승인이 열린다", () => {
+    renderCard({
+      ...BASE,
+      midApproval: { approverName: "김서준", approvedAt: "2026-11-03" },
+    });
+
+    expect(screen.getByRole("button", { name: "최종 승인" })).toBeEnabled();
+  });
+
+  it("팀장 본인 신청은 중간 승인 단계가 없어 바로 열린다", () => {
+    renderCard({ ...BASE, requesterAuthority: AUTHORITY.LEADER }, true);
+
+    expect(screen.getByRole("button", { name: "최종 승인" })).toBeEnabled();
+  });
+});

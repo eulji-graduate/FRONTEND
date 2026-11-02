@@ -2,7 +2,7 @@
 
 import { CircleAlert, Download } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -96,6 +96,15 @@ export function HandoverApprovalCard({
 
   const isVacation = handover.type === HANDOVER_TYPE.VACATION;
   const typeLabel = HANDOVER_TYPE_LABEL[handover.type];
+  /*
+    ⚠️ **일반 팀원 신청은 중간 승인 전엔 최종 승인을 잠근다**(#6). 서버
+       (`approveHandoverAction`·BE `finalizeApproval`)가 같은 규칙으로 막는데, 화면이 버튼을
+       열어 두면 눌러 본 뒤에야 실패 문구를 만난다. 왜 잠겼는지는 바로 위 문장이 이미
+       말하므로 `aria-describedby`로 그 문장에 잇는다 — 이유 없는 회색 버튼이 아니다.
+    ⚠️ 반려는 열어 둔다 — 중간 승인과 무관하게 서버가 받는다.
+  */
+  const isAwaitingMidApproval = !isRequesterLeader && !handover.midApproval;
+  const midStatusId = useId();
   /*
     ⚠️ **제목에 팀장/사원을 박아 넣는다**(사용자 확정, 2026-08-08) — 전에는 본문을 읽어야만
        팀장 본인 신청인지 알 수 있었다. "팀장 휴직"·"사원 오프보딩"처럼 넷을 한눈에
@@ -191,7 +200,10 @@ export function HandoverApprovalCard({
           ⚠️ 중간 승인 여부만 적는다. 팀장 본인 신청이면 중간 단계가 없어 `null`이고,
              그때 "중간 승인이 없다"가 아니라 **왜 없는지**를 적어야 빠뜨린 것처럼 안 읽힌다.
         */}
-        <p className="border-border bg-secondary/40 text-muted-foreground rounded-lg border px-4 py-3 text-[13px] leading-5 break-keep">
+        <p
+          id={midStatusId}
+          className="border-border bg-secondary/40 text-muted-foreground rounded-lg border px-4 py-3 text-[13px] leading-5 break-keep"
+        >
           {handover.midApproval
             ? `${handover.midApproval.approverName} 리더가 ${formatMonthDayWeekday(handover.midApproval.approvedAt)} 중간 승인했습니다.`
             : isRequesterLeader
@@ -256,7 +268,8 @@ export function HandoverApprovalCard({
               type="button"
               size="sm"
               variant="ink"
-              disabled={isPending}
+              disabled={isPending || isAwaitingMidApproval}
+              aria-describedby={isAwaitingMidApproval ? midStatusId : undefined}
               onClick={() => {
                 setError(null);
                 setConfirming("approve");
