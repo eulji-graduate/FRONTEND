@@ -50,7 +50,9 @@ export interface ManagedMember {
    * ⚠️ **행에 실어 둔다.** 상태만 보면 휴직 대기와 오프보딩 대기가 둘 다 `WAITING`이라
    *    구분이 안 된다 — 예전에는 이걸 알려고 목록이 상세를 사람 수만큼 훑었다(N+1).
    *    하나만 실패해도 목록 전체가 오류 화면이 됐다.
-   * ⚠️ 컬럼으로 **보여주지는 않는다**(WORKFLOW §9의 컬럼 목록에 없다). 거르는 데만 쓴다.
+   * ⚠️ **열을 따로 만들지는 않는다**(WORKFLOW §9의 컬럼 목록에 없다). 대신 `상태` 배지가 이
+   *    값으로 "휴직 대기"·"오프보딩 대기"를 가르고(`memberStatusLabel`, 디자인 시안 ②),
+   *    필터(`manage-filter`)가 이 값으로 거른다.
    */
   pendingHandoverType: HandoverType | null;
 }
