@@ -248,6 +248,16 @@ export function HandoverApprovalCard({
           </Button>
         )}
 
+        {/*
+          ⚠️ **버튼이 없는 이유를 적는다**(디자인 시안 ③). 이 화면에 들어오는데 승인 권한이
+             없는 사람은 겸직 관리자뿐이다 — 말없이 버튼만 비우면 고장 난 줄 안다.
+        */}
+        {!canApprove && (
+          <p className="text-muted-foreground text-right text-[12px] leading-4">
+            최종 승인·반려는 대표만 할 수 있습니다.
+          </p>
+        )}
+
         {canApprove && (
           <div className="flex items-center justify-end gap-2">
             <Button

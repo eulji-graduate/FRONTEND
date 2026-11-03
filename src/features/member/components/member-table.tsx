@@ -177,7 +177,7 @@ export function MemberTable({
           {members.map((member) => (
             <tr
               key={member.id}
-              className="border-border hover:bg-secondary/50 border-b transition-colors last:border-b-0"
+              className="border-border hover:bg-foreground/[0.04] border-b transition-colors last:border-b-0"
             >
               <th scope="row" className="px-7 py-3.5 text-left font-normal">
                 <Link

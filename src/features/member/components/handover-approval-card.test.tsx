@@ -20,18 +20,34 @@ const BASE: PendingHandover = {
   requesterAuthority: AUTHORITY.MEMBER,
 };
 
-function renderCard(handover: PendingHandover, isRequesterLeader = false) {
+function renderCard(handover: PendingHandover, isRequesterLeader = false, canApprove = true) {
   render(
     <HandoverApprovalCard
       memberId={3}
       memberName="이하윤"
       memberAuthority={isRequesterLeader ? AUTHORITY.LEADER : AUTHORITY.MEMBER}
       handover={handover}
-      canApprove
+      canApprove={canApprove}
       isRequesterLeader={isRequesterLeader}
     />,
   );
 }
+
+describe("HandoverApprovalCard — 겸직 관리자", () => {
+  it("승인 권한이 없으면 버튼 대신 대표만 할 수 있다고 적는다", () => {
+    renderCard(BASE, false, false);
+
+    expect(screen.queryByRole("button", { name: "최종 승인" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "반려" })).not.toBeInTheDocument();
+    expect(screen.getByText("최종 승인·반려는 대표만 할 수 있습니다.")).toBeInTheDocument();
+  });
+
+  it("대표에게는 안내 문구를 띄우지 않는다", () => {
+    renderCard(BASE);
+
+    expect(screen.queryByText("최종 승인·반려는 대표만 할 수 있습니다.")).not.toBeInTheDocument();
+  });
+});
 
 describe("HandoverApprovalCard — 중간 승인 전 최종 승인 잠금", () => {
   it("일반 팀원 신청이 중간 승인 전이면 최종 승인을 잠그고 그 이유 문장에 잇는다", () => {
