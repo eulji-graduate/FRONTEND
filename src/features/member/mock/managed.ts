@@ -127,7 +127,12 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
         id: "h-301",
         type: HANDOVER_TYPE.VACATION,
         period: { from: addDaysIso(today, 3), to: addDaysIso(today, 7) },
-        actionCount: 3,
+        /*
+        ⚠️ **인계 항목은 2건이다 — 위 담당 액션(3건)과 일부러 다른 숫자다.** 완료한 액션(a-103)은
+           넘길 일이 없어 인수인계서에 안 담긴다. BE 시드(`db/local/data.sql` 인수인계 301)도
+           액션 101·102 둘만 담는다(#10).
+      */
+        actionCount: 2,
         /*
         ⚠️ 아직 팀장 중간 승인 전이다(`null`) — `/team/handover`에서 김서준이 이 신청을
            처리해야 하는 데모 대상이다. 이미 중간 승인된 신청 데모는 임지안(id 8)이 맡는다.
@@ -195,7 +200,18 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
         joinedAt: "2020-09-01",
         pendingHandoverType: null,
       },
-      actions: [],
+      /*
+        ⚠️ 임지안(id 8)의 오프보딩 인계에서 넘겨받은 액션이다 — BE 시드가 액션 105를 6번으로
+           옮긴다(#10).
+      */
+      actions: [
+        {
+          id: "a-105",
+          title: "캠페인 소재 정리",
+          status: ACTION_STATUS.IN_PROGRESS,
+          dueDate: addDaysIso(today, 14),
+        },
+      ],
       pendingHandover: null,
     },
     {
@@ -230,19 +246,18 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
         joinedAt: "2024-06-01",
         pendingHandoverType: null,
       },
-      actions: [
-        {
-          id: "a-105",
-          title: "캠페인 소재 정리",
-          status: ACTION_STATUS.IN_PROGRESS,
-          dueDate: addDaysIso(today, 14),
-        },
-      ],
+      /*
+        ⚠️ **담당 액션이 없다.** 팀장 중간 승인(최유진)이 끝난 신청이라 넘길 액션은 이미 재할당됐다 —
+           `캠페인 소재 정리`(a-105)는 정민석(id 6)이 맡고 있다. BE 시드(인수인계 302)도 액션 105를
+           6번에게 옮긴다(#10).
+      */
+      actions: [],
       pendingHandover: {
         id: "h-302",
         type: HANDOVER_TYPE.OFFBOARDING,
         period: null,
-        actionCount: 5,
+        /* ⚠️ 넘긴 항목은 1건(`캠페인 소재 정리`)이다 — BE 시드(인수인계 302)와 같다. 담당 액션 수와는 별개다 */
+        actionCount: 1,
         midApproval: { approverName: "최유진", approvedAt: addDaysIso(today, -2) },
         requesterAuthority: AUTHORITY.MEMBER,
       },
