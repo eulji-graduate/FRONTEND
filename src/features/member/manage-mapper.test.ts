@@ -1,4 +1,5 @@
 import { ACTION_STATUS } from "@/constants/domain";
+import { HANDOVER_TYPE } from "@/constants/handover";
 
 import {
   type BeCompanyAction,
@@ -78,5 +79,47 @@ describe("toManagedMember — roleLabel 정규화", () => {
 
   it("실제 역할 이름은 그대로 옮긴다", () => {
     expect(toManagedMember({ ...BE_MEMBER, roleLabel: "프론트엔드" }).roleLabel).toBe("프론트엔드");
+  });
+});
+
+/**
+ * ⚠️ **목록 응답이 대기 신청 종류를 준다**(BE PR #9, 값은 `WAITING`일 때만). `VACATION` ·
+ *    `OFFBOARDING`이면 그 상수로, 그 밖이면 `null`로 옮긴다 — 라벨을 찾는 쪽이 모르는 값에
+ *    `undefined`를 받지 않게 하고, 틀린 종류를 말하지 않으려는 것이다(§정직성).
+ */
+describe("toManagedMember — pendingHandoverType", () => {
+  const waiting = { ...BE_MEMBER, workStatus: "WAITING" };
+
+  it("휴직 대기는 `VACATION`으로 옮긴다", () => {
+    expect(
+      toManagedMember({ ...waiting, pendingHandoverType: "VACATION" }).pendingHandoverType,
+    ).toBe(HANDOVER_TYPE.VACATION);
+  });
+
+  it("오프보딩 대기는 `OFFBOARDING`으로 옮긴다", () => {
+    expect(
+      toManagedMember({ ...waiting, pendingHandoverType: "OFFBOARDING" }).pendingHandoverType,
+    ).toBe(HANDOVER_TYPE.OFFBOARDING);
+  });
+
+  it("대기 신청이 없으면(`null`) `null`이다", () => {
+    expect(
+      toManagedMember({ ...BE_MEMBER, pendingHandoverType: null }).pendingHandoverType,
+    ).toBeNull();
+  });
+
+  it("필드 자체가 안 와도(BE 배포 전, `undefined`) 깨지지 않고 `null`이다", () => {
+    expect(toManagedMember(BE_MEMBER).pendingHandoverType).toBeNull();
+  });
+
+  it("모르는 값은 `null`이다 — 틀린 종류를 말하지 않는다", () => {
+    expect(
+      toManagedMember({ ...waiting, pendingHandoverType: "RESIGN" }).pendingHandoverType,
+    ).toBeNull();
+    expect(toManagedMember({ ...waiting, pendingHandoverType: "" }).pendingHandoverType).toBeNull();
+  });
+
+  it("상태는 그대로 `WAITING`이다 — 종류를 읽어도 다른 값을 건드리지 않는다", () => {
+    expect(toManagedMember({ ...waiting, pendingHandoverType: "VACATION" }).status).toBe("WAITING");
   });
 });
