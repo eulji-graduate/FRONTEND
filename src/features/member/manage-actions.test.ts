@@ -19,7 +19,9 @@ import { type AccountDraft, MEMBER_FILTER } from "./manage-types";
 import {
   completeMockHandoverMidApproval,
   findMockManagedMember,
+  listMockHandoverActions,
   listMockManagedMembers,
+  reassignMockHandoverAction,
   resetMockManagedMembers,
 } from "./mock/managed";
 
@@ -342,6 +344,36 @@ describe("승인 · 반려", () => {
     await approveHandoverAction(8);
 
     expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).toContain("a-105");
+  });
+
+  /* #27 — `/team/handover` 상세가 이 목에서 인계 액션을 읽는다(BE 시드 101·102·106) */
+  it("이하윤의 인계 대상은 미완료 3건이다(a-101·a-102·a-106)", () => {
+    expect(listMockHandoverActions(WAITING_ID).map((action) => action.id)).toEqual([
+      "a-101",
+      "a-102",
+      "a-106",
+    ]);
+  });
+
+  it("팀장이 재배정하면 액션이 옮겨지고, 반려하면 원래 담당자에게 돌아온다", async () => {
+    reassignMockHandoverAction(WAITING_ID, "a-102", 4);
+    completeMockHandoverMidApproval(WAITING_ID, "김서준", "2026-11-09");
+
+    expect(
+      findMockManagedMember(WAITING_ID)?.actions?.items.map((action) => action.id),
+    ).not.toContain("a-102");
+    expect(findMockManagedMember(4)?.actions?.items.map((action) => action.id)).toContain("a-102");
+
+    expect(await rejectHandoverAction(WAITING_ID, "다시 확인해 주세요")).toEqual({
+      isSuccess: true,
+    });
+
+    expect(findMockManagedMember(WAITING_ID)?.actions?.items.map((action) => action.id)).toContain(
+      "a-102",
+    );
+    expect(findMockManagedMember(4)?.actions?.items.map((action) => action.id)).not.toContain(
+      "a-102",
+    );
   });
 
   /* ⚠️ 이하윤 건수는 BE 시드(인수인계 301)와 같다 — 담당 4건 중 완료 1건은 인계에서 빠진다 */

@@ -1,13 +1,11 @@
 import "server-only";
 
-import { ACTION_STATUS, isVisibleMemberStatus, type MemberStatus } from "@/constants/domain";
+import { isVisibleMemberStatus, type MemberStatus } from "@/constants/domain";
 import { requireAccessToken } from "@/features/auth/session";
 import { getManagedMember, listManagedMembers } from "@/features/member/manage-server";
-import {
-  TEAM_ACTION_DETAIL_MOCK,
-  TEAM_ACTION_PERSONAL_ITEMS_MOCK,
-} from "@/features/project/mock/team-action-detail";
+import { listMockHandoverActions } from "@/features/member/mock/managed";
 import { ApiError, serverApi } from "@/lib/api";
+import { addDaysIso, todayIso } from "@/lib/date";
 import { ep } from "@/lib/endpoints";
 import { isMock } from "@/mocks/config";
 
@@ -21,30 +19,41 @@ import type {
 } from "./types";
 
 /**
- * 타임라인용 "인계 액션" — `member/mock/managed.ts`의 개인 액션 목록은 `startDate`가 없어
- * 기간 바를 못 그린다. 대신 `leader-handover`가 쓴 것과 같은 소스(`TEAM_ACTION_PERSONAL_ITEMS_MOCK`)
- * 에서 이 신청자 명의 항목만 골라 쓴다(완료 건은 재배정 대상이 아니라 뺀다).
+ * 인계 액션의 프로젝트·상위 팀 액션·시작일 — **BE 시드(`db/local/data.sql`) 그대로**(#27).
+ * ⚠️ 사원 목(`member/mock/managed.ts`)에는 이 셋이 없어 여기서 붙인다. 액션 id가 같아야
+ *    사원 상세·인수인계 상세가 같은 일을 가리킨다(전에는 다른 목에서 1건만 가져와 어긋났다).
+ * ⚠️ **시작일이 비어 있는 액션이 있다**(102·106). 실서버 매퍼도 빈 값(`""`)으로 넘기므로
+ *    목도 똑같이 빈 값을 준다 — 타임라인이 그 값을 어떻게 다루는지는 `lib.ts` 몫이다.
  */
-function buildHandoverActions(memberName: string): TeamHandoverAction[] {
-  const actions: TeamHandoverAction[] = [];
-  for (const [teamActionId, items] of Object.entries(TEAM_ACTION_PERSONAL_ITEMS_MOCK)) {
-    const parent = TEAM_ACTION_DETAIL_MOCK[Number(teamActionId)];
-    if (!parent) continue;
-    for (const item of items) {
-      if (item.assigneeName !== memberName) continue;
-      if (item.status === ACTION_STATUS.DONE) continue;
-      actions.push({
-        id: item.id,
-        projectTag: parent.projectTag,
-        parentTeamActionName: parent.name,
-        title: item.title,
-        status: item.status,
-        startDate: item.startDate,
-        dueDate: item.dueDate,
-      });
-    }
-  }
-  return actions;
+const MOCK_HANDOVER_ACTION_CONTEXT = {
+  projectTag: "ONBOARDING",
+  parentTeamActionName: "온보딩 개선 개발",
+} as const;
+/** 오늘 기준 며칠 전에 시작했는지. `null`은 BE 시드에서도 시작일이 비어 있다는 뜻이다 */
+const MOCK_START_OFFSET_DAYS: Record<string, number | null> = {
+  "a-101": -3,
+  "a-102": null,
+  "a-106": null,
+};
+
+/** 목 액션 id(`a-101`) → BE 액션 id(101). */
+function toHandoverActionId(mockId: string): number {
+  return Number(mockId.replace(/^a-/, ""));
+}
+
+function buildHandoverActions(memberId: number): TeamHandoverAction[] {
+  const today = todayIso();
+  return listMockHandoverActions(memberId).map((action) => {
+    const offset = MOCK_START_OFFSET_DAYS[action.id];
+    return {
+      id: toHandoverActionId(action.id),
+      ...MOCK_HANDOVER_ACTION_CONTEXT,
+      title: action.title,
+      status: action.status,
+      startDate: offset == null ? "" : addDaysIso(today, offset),
+      dueDate: action.dueDate,
+    };
+  });
 }
 
 /** [확인] BE `TeamMemberStatusResponse` — `team/server.ts`와 같은 응답(PR #354 머지 완료). */
@@ -156,7 +165,7 @@ export async function getTeamHandoverDetail(
       type: handover.type,
       period: handover.period,
       actionCount: handover.actionCount,
-      actions: buildHandoverActions(detail.member.name),
+      actions: buildHandoverActions(memberId),
       teammates,
     };
   }
