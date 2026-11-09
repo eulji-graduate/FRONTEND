@@ -142,10 +142,13 @@ export const ep = {
   companyOnboarding: () => "/api/companies/me/onboarding",
   /*
    * 저장소 관리(`/manage/storage`). [확인] BE `CompanyStorageController`
-   * (`metering` 패키지, 2026-08-14 BE PR #494) — `GET`만 있다. 프로젝트별 저장 기록
-   * 삭제(`DELETE .../projects/{tag}`)는 BE에 아직 없다(`deleteRecordingsAction` 참고).
+   * (`metering` 패키지, 2026-08-14 BE PR #494). 프로젝트별 저장 기록 삭제
+   * (`DELETE .../projects/{tag}`)도 develop에 있다(`deleteRecordingsAction`, #26).
+   * ⚠️ 태그는 주소 한 칸이라 인코딩한다 — `/`·공백이 섞이면 다른 경로로 읽힌다.
    */
   companyStorage: () => "/api/companies/me/storage",
+  companyStorageProject: (tag: string) =>
+    `/api/companies/me/storage/projects/${encodeURIComponent(tag)}`,
 
   /*
    * 회의 — [확인] BE 실코드 대조(2026-08-12, 커밋 `51b5482f` "회의·회의실·공지사항 API 경로 통일" 리팩터 반영)
