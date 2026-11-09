@@ -48,6 +48,38 @@ export function mapHandoverStatusFromBe(status: HandoverStatusBe): HandoverStatu
   }
 }
 
+/**
+ * 최종 승인을 못 하는 이유 — [확인] BE `HandoverFinalApproval.BlockReason`(`momo/handover-approval`).
+ * ⚠️ **판정은 BE가 한다.** 화면은 이 값을 문장으로 옮길 뿐이고, 권한·중간 승인으로 다시
+ *    추정하지 않는다 — 추정하면 BE 규칙(지금 팀장인지 등)이 바뀔 때 둘이 갈린다.
+ */
+export const FINALIZE_BLOCK_REASON = {
+  OWNER_REQUIRED: "OWNER_REQUIRED",
+  INTERMEDIATE_APPROVAL_REQUIRED: "INTERMEDIATE_APPROVAL_REQUIRED",
+  ALREADY_FINALIZED: "ALREADY_FINALIZED",
+  ALREADY_REJECTED: "ALREADY_REJECTED",
+} as const;
+export type FinalizeBlockReason =
+  (typeof FINALIZE_BLOCK_REASON)[keyof typeof FINALIZE_BLOCK_REASON];
+
+/** 문구는 BE 담당자(성진님) 요청 그대로다(2026-11-09) */
+export const FINALIZE_BLOCK_REASON_LABEL: Record<FinalizeBlockReason, string> = {
+  OWNER_REQUIRED: "최종 승인은 대표만 할 수 있습니다.",
+  INTERMEDIATE_APPROVAL_REQUIRED: "팀장의 중간 승인 후 최종 승인할 수 있습니다.",
+  ALREADY_FINALIZED: "이미 최종 승인된 신청입니다.",
+  ALREADY_REJECTED: "이미 반려된 신청입니다.",
+};
+
+/** 모르는 사유가 와도 이유 없는 회색 버튼은 두지 않는다(§정직성) */
+export const FINALIZE_BLOCK_FALLBACK_LABEL = "지금은 최종 승인할 수 없습니다.";
+
+/** 응답 경계 — 모르는 값은 `null`(화면은 `FINALIZE_BLOCK_FALLBACK_LABEL`을 쓴다) */
+export function toFinalizeBlockReason(value: unknown): FinalizeBlockReason | null {
+  return typeof value === "string" && value in FINALIZE_BLOCK_REASON
+    ? (value as FinalizeBlockReason)
+    : null;
+}
+
 export const HANDOVER_TYPE = {
   VACATION: "VACATION",
   OFFBOARDING: "OFFBOARDING",

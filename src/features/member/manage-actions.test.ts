@@ -241,8 +241,24 @@ describe("승인 · 반려", () => {
   */
   it("중간 승인 전에는 최종 승인을 막는다", async () => {
     const result = await approveHandoverAction(WAITING_ID);
-    expect(result.isSuccess).toBe(false);
+    expect(result).toEqual({
+      isSuccess: false,
+      message: "팀장의 중간 승인 후 최종 승인할 수 있습니다.",
+    });
     expect(findMockManagedMember(WAITING_ID)?.pendingHandover).not.toBeNull();
+  });
+
+  /* 목도 BE처럼 조회자 기준으로 판정한다 — 조회자를 모르면 대표가 아닌 것으로 본다 */
+  it("목 조회는 조회자가 대표일 때만 canFinalize가 참이다", () => {
+    completeMockHandoverMidApproval(WAITING_ID, "김서준", "2026-08-08");
+
+    expect(
+      findMockManagedMember(WAITING_ID, { isViewerOwner: true })?.pendingHandover,
+    ).toMatchObject({ canFinalize: true, finalizeBlockReason: null });
+    expect(findMockManagedMember(WAITING_ID)?.pendingHandover).toMatchObject({
+      canFinalize: false,
+      finalizeBlockReason: "OWNER_REQUIRED",
+    });
   });
 
   it("휴직을 승인하면 휴직 상태가 되고 신청이 사라진다", async () => {

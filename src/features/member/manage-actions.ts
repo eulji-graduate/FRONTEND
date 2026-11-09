@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import type { Authority } from "@/constants/authority";
 import { AUTHORITY, POSITION_AUTHORITIES } from "@/constants/authority";
+import { FINALIZE_BLOCK_FALLBACK_LABEL, FINALIZE_BLOCK_REASON_LABEL } from "@/constants/handover";
 import { requireAccessToken } from "@/features/auth/session";
 import { getCompanyOrg } from "@/features/company/server";
 import { getViewer } from "@/features/shell/viewer";
@@ -359,29 +360,33 @@ async function findTeamLeaderClash(
 }
 
 const NO_PENDING = "승인을 기다리는 신청이 없습니다";
-const NO_MID_APPROVAL = "팀장 중간 승인이 아직 끝나지 않았습니다";
 
 /**
  * 최종 승인 — **OWNER 전용**(WORKFLOW §7, 2026-08-06 Admin 제외).
  * ⚠️ 신청이 실제로 있는지 서버가 다시 본다 — 화면이 보낸 id만 믿으면 이미 처리된 건을
  *    두 번 승인하게 된다.
  * ⚠️ **일반 팀원 신청은 중간 승인이 끝나야 최종 승인할 수 있다**(CodeRabbit 지적,
- *    2026-08-09) — 화면(`handover-approval-card.tsx`)은 `canApprove`가 있으면 늘 버튼을
- *    그리지만, 팀장이 아직 `/team/handover`에서 처리하지 않은 건까지 여기서 바로 승인해
- *    버리면 중간 승인 단계가 통째로 건너뛰인다. **팀장 본인 신청**(`requesterAuthority`가
- *    LEADER)은 원래 중간 승인이 없는 흐름이라 이 검사에서 뺀다(WORKFLOW §7).
+ *    2026-08-09) — 화면이 잠가도 액션은 직접 부를 수 있다. 목은 BE와 같은 판정
+ *    (`canFinalize`, `evaluateFinalApproval`)으로 다시 막는다. 지금 그 팀 팀장의 본인 신청은
+ *    원래 중간 승인이 없는 흐름이라 열린다(WORKFLOW §7).
  */
 export async function approveHandoverAction(id: number): Promise<MemberActionResult> {
   const pass = await gate(canApproveFinal, "최종 승인은 대표만 할 수 있습니다");
   if ("denied" in pass) return { isSuccess: false, message: pass.denied };
 
   if (isMock) {
-    const pendingHandover = findMockManagedMember(id)?.pendingHandover;
+    // ⚠️ 위 문지기(`canApproveFinal`)를 지났으니 조회자는 대표다
+    const pendingHandover = findMockManagedMember(id, { isViewerOwner: true })?.pendingHandover;
     if (!pendingHandover) {
       return { isSuccess: false, message: NO_PENDING };
     }
-    if (pendingHandover.requesterAuthority !== AUTHORITY.LEADER && !pendingHandover.midApproval) {
-      return { isSuccess: false, message: NO_MID_APPROVAL };
+    if (!pendingHandover.canFinalize) {
+      return {
+        isSuccess: false,
+        message: pendingHandover.finalizeBlockReason
+          ? FINALIZE_BLOCK_REASON_LABEL[pendingHandover.finalizeBlockReason]
+          : FINALIZE_BLOCK_FALLBACK_LABEL,
+      };
     }
     approveMockHandover(id);
   } else {

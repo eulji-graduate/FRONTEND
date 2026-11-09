@@ -4,6 +4,7 @@ import { HANDOVER_TYPE } from "@/constants/handover";
 import { DELETED_MEMBER_STATUS, isVisibleMemberStatus, MEMBER_STATUS } from "@/constants/member";
 import { addDaysIso, todayIso } from "@/lib/date";
 
+import { evaluateFinalApproval } from "../final-approval";
 import type {
   ManagedMember,
   ManagedMemberAction,
@@ -19,10 +20,20 @@ import type {
  *    반복될 뿐이라, **읽는 자리(`findMockManagedMember`)에서 한 번에 씌운다** — 목은
  *    "이 사람이 무슨 액션을 들고 있나"만 적는다.
  */
+/**
+ * 목이 들고 있는 신청 — 최종 승인 판정 셋은 **빼고** 둔다.
+ * ⚠️ 그 셋은 조회자마다 다르다(BE도 조회자 기준으로 계산한다). 저장해 두면 대표가 보든
+ *    겸직 관리자가 보든 같은 값이 나가므로, 읽는 자리(`findMockManagedMember`)에서 계산한다.
+ */
+type MockPendingHandover = Omit<
+  PendingHandover,
+  "canFinalize" | "requiresIntermediateApproval" | "finalizeBlockReason"
+>;
+
 interface MockManagedMemberEntry {
   member: ManagedMember;
   actions: ManagedMemberAction[];
-  pendingHandover: PendingHandover | null;
+  pendingHandover: MockPendingHandover | null;
   /**
    * 중간 승인으로 **이미 남에게 넘어간** 액션 — 반려하면 이걸 보고 원래 담당자에게 되돌린다.
    * ⚠️ 목에만 있는 기록이다. 화면 계약(`PendingHandover`)에 넣지 않는다 — BE는 이 이력을
@@ -150,11 +161,6 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
            처리해야 하는 데모 대상이다. 이미 중간 승인된 신청 데모는 임지안(id 8)이 맡는다.
       */
         midApproval: null,
-        /*
-        ⚠️ **신청 당시** 값을 굳혀 둔다(CodeRabbit 지적, 2026-08-09) — 나중에 이 사람의
-           `authority`가 바뀌어도(팀장 승급 등) 이 신청은 그때 기준을 그대로 유지한다.
-      */
-        requesterAuthority: AUTHORITY.MEMBER,
       },
     },
     {
@@ -272,7 +278,6 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
         /* ⚠️ 넘긴 항목은 1건(`캠페인 소재 정리`)이다 — BE 시드(인수인계 302)와 같다. 담당 액션 수와는 별개다 */
         actionCount: 1,
         midApproval: { approverName: "최유진", approvedAt: addDaysIso(today, -2) },
-        requesterAuthority: AUTHORITY.MEMBER,
       },
     },
     {
@@ -347,15 +352,30 @@ export function listMockManagedMembers(): ManagedMember[] {
  *    있어서, 그 팀의 역할 목록과 대조해야 id를 찾을 수 있다 — 그건 팀 목록을 아는
  *    `manage-server.ts`(`getManagedMember`)가 `roleIdOf`로 채운다.
  */
-export function findMockManagedMember(id: number): Omit<ManagedMemberDetail, "roleId"> | null {
+export function findMockManagedMember(
+  id: number,
+  { isViewerOwner = false }: { isViewerOwner?: boolean } = {},
+): Omit<ManagedMemberDetail, "roleId"> | null {
   const found = store.find((entry) => entry.member.id === id);
   if (!found) return null;
 
   const entry = clone(found);
+  /*
+    ⚠️ **조회자를 모르면 대표가 아닌 것으로 본다** — 버튼이 잠기는 쪽이 안전하다.
+    ⚠️ 팀장인지는 **지금 권한**으로 본다(BE `approvalFor`가 지금 팀장 id와 비교한다).
+  */
+  const pendingHandover = entry.pendingHandover && {
+    ...entry.pendingHandover,
+    ...evaluateFinalApproval({
+      hasMidApproval: entry.pendingHandover.midApproval !== null,
+      isWriterCurrentLeader: entry.member.authority === AUTHORITY.LEADER,
+      isViewerOwner,
+    }),
+  };
   return {
     member: entry.member,
     actions: { items: entry.actions, totalCount: entry.actions.length },
-    pendingHandover: entry.pendingHandover,
+    pendingHandover,
   };
 }
 
