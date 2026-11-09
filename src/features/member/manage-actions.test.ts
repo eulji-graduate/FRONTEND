@@ -304,6 +304,38 @@ describe("승인 · 반려", () => {
     expect(after?.pendingHandover).toBeNull();
   });
 
+  /*
+    ⚠️ **중간 승인으로 넘어간 액션은 반려하면 원래 담당자에게 돌아온다**(BE
+       `rollbackCommittedReassignments`와 같은 결과). 임지안(8)의 `캠페인 소재 정리`(a-105)는
+       중간 승인 때 정민석(6)에게 넘어가 있다.
+  */
+  it("오프보딩을 반려하면 넘긴 액션이 원래 담당자에게 돌아온다", async () => {
+    expect(findMockManagedMember(8)?.actions?.items.map((action) => action.id)).toEqual([]);
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).toContain("a-105");
+
+    expect(await rejectHandoverAction(8, "인계 대상이 잘못됐습니다")).toEqual({ isSuccess: true });
+
+    expect(findMockManagedMember(8)?.actions?.items.map((action) => action.id)).toEqual(["a-105"]);
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).not.toContain(
+      "a-105",
+    );
+    expect(findMockManagedMember(8)?.member.status).toBe(MEMBER_STATUS.ACTIVE);
+  });
+
+  it("오프보딩을 승인하면 넘긴 액션은 받은 사람에게 그대로 남는다", async () => {
+    await approveHandoverAction(8);
+
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).toContain("a-105");
+  });
+
+  /* ⚠️ 이하윤 건수는 BE 시드(인수인계 301)와 같다 — 담당 4건 중 완료 1건은 인계에서 빠진다 */
+  it("이하윤은 담당 액션 4건, 인계 액션 3건이다", () => {
+    const hayun = findMockManagedMember(WAITING_ID);
+
+    expect(hayun?.actions?.totalCount).toBe(4);
+    expect(hayun?.pendingHandover?.actionCount).toBe(3);
+  });
+
   /* ⚠️ 사유 없이 되돌리면 신청한 사람은 무엇을 고쳐 다시 낼지 알 수 없다 */
   it("사유 없는 반려는 막는다", async () => {
     expect(await rejectHandoverAction(WAITING_ID, "   ")).toMatchObject({ isSuccess: false });

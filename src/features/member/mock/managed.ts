@@ -23,6 +23,12 @@ interface MockManagedMemberEntry {
   member: ManagedMember;
   actions: ManagedMemberAction[];
   pendingHandover: PendingHandover | null;
+  /**
+   * 중간 승인으로 **이미 남에게 넘어간** 액션 — 반려하면 이걸 보고 원래 담당자에게 되돌린다.
+   * ⚠️ 목에만 있는 기록이다. 화면 계약(`PendingHandover`)에 넣지 않는다 — BE는 이 이력을
+   *    서버 안에서 들고 반려 때 스스로 되돌린다(`HandoverService.rollbackCommittedReassignments`).
+   */
+  handedOver?: { actionId: string; toMemberId: number }[];
 }
 
 /**
@@ -122,17 +128,23 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
           status: ACTION_STATUS.DONE,
           dueDate: addDaysIso(today, -10),
         },
+        {
+          id: "a-106",
+          title: "온보딩 QA 체크리스트 작성",
+          status: ACTION_STATUS.TODO,
+          dueDate: addDaysIso(today, 4),
+        },
       ],
       pendingHandover: {
         id: "h-301",
         type: HANDOVER_TYPE.VACATION,
         period: { from: addDaysIso(today, 3), to: addDaysIso(today, 7) },
         /*
-        ⚠️ **인계 항목은 2건이다 — 위 담당 액션(3건)과 일부러 다른 숫자다.** 완료한 액션(a-103)은
+        ⚠️ **인계 항목은 3건이다 — 위 담당 액션(4건)과 일부러 다른 숫자다.** 완료한 액션(a-103)은
            넘길 일이 없어 인수인계서에 안 담긴다. BE 시드(`db/local/data.sql` 인수인계 301)도
-           액션 101·102 둘만 담는다(#10).
+           미완료 액션 101·102·106 셋만 담는다(#10, #16 재대조).
       */
-        actionCount: 2,
+        actionCount: 3,
         /*
         ⚠️ 아직 팀장 중간 승인 전이다(`null`) — `/team/handover`에서 김서준이 이 신청을
            처리해야 하는 데모 대상이다. 이미 중간 승인된 신청 데모는 임지안(id 8)이 맡는다.
@@ -252,6 +264,7 @@ function buildInitial(today: string): MockManagedMemberEntry[] {
            6번에게 옮긴다(#10).
       */
       actions: [],
+      handedOver: [{ actionId: "a-105", toMemberId: 6 }],
       pendingHandover: {
         id: "h-302",
         type: HANDOVER_TYPE.OFFBOARDING,
@@ -406,6 +419,8 @@ export function approveMockHandover(id: number): void {
         authority: !isVacation && wasLeader ? AUTHORITY.MEMBER : entry.member.authority,
       },
       pendingHandover: null,
+      // 승인하면 넘긴 액션은 받은 사람에게 그대로 남는다 — 되돌릴 기록을 지운다
+      handedOver: [],
     };
   });
 }
@@ -430,13 +445,34 @@ export function completeMockHandoverMidApproval(
 }
 
 /** 반려 — 신청을 치우고 사람은 재직으로 되돌린다 */
+/**
+ * 반려 — 신청자를 재직으로 되돌리고, **중간 승인으로 넘어간 액션을 원래 담당자에게 돌려준다**.
+ * ⚠️ BE와 같은 결과여야 한다(`HandoverService.reject` → `rollbackCommittedReassignments`) —
+ *    목만 액션을 받은 사람에게 남겨 두면 데모에서 "반려했는데 일이 안 돌아왔다"로 보인다.
+ */
 export function rejectMockHandover(id: number): void {
+  const requester = store.find((entry) => entry.member.id === id && entry.pendingHandover);
+  if (!requester) return;
+
+  const handedOver = requester.handedOver ?? [];
+  const returned: ManagedMemberAction[] = [];
+
+  store = store.map((entry) => {
+    const moved = handedOver.filter((item) => item.toMemberId === entry.member.id);
+    if (moved.length === 0) return entry;
+    const movedIds = new Set(moved.map((item) => item.actionId));
+    returned.push(...entry.actions.filter((action) => movedIds.has(action.id)));
+    return { ...entry, actions: entry.actions.filter((action) => !movedIds.has(action.id)) };
+  });
+
   store = store.map((entry) =>
-    entry.member.id === id && entry.pendingHandover
+    entry.member.id === id
       ? {
           ...entry,
           member: { ...entry.member, status: MEMBER_STATUS.ACTIVE },
+          actions: [...entry.actions, ...returned],
           pendingHandover: null,
+          handedOver: [],
         }
       : entry,
   );

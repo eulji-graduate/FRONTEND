@@ -4,6 +4,7 @@ jest.mock("../manage-actions", () => ({
 }));
 
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 
 import { AUTHORITY } from "@/constants/authority";
 import { HANDOVER_TYPE } from "@/constants/handover";
@@ -46,6 +47,37 @@ describe("HandoverApprovalCard — 겸직 관리자", () => {
     renderCard(BASE);
 
     expect(screen.queryByText("최종 승인·반려는 대표만 할 수 있습니다.")).not.toBeInTheDocument();
+  });
+
+  it("승인 권한이 없으면 '검토 필요' 배지도 숨긴다", () => {
+    renderCard(BASE, false, false);
+
+    expect(screen.queryByText("검토 필요")).not.toBeInTheDocument();
+  });
+
+  it("대표에게는 '검토 필요' 배지를 단다", () => {
+    renderCard(BASE);
+
+    expect(screen.getByText("검토 필요")).toBeInTheDocument();
+  });
+});
+
+describe("HandoverApprovalCard — 반려 안내", () => {
+  it("오프보딩 반려 창은 넘긴 액션이 원래 담당자에게 돌아간다고 적는다", async () => {
+    const user = userEvent.setup();
+    renderCard({
+      ...BASE,
+      type: HANDOVER_TYPE.OFFBOARDING,
+      period: null,
+      midApproval: { approverName: "최유진", approvedAt: "2026-11-07" },
+    });
+
+    await user.click(screen.getByRole("button", { name: "반려" }));
+
+    expect(
+      await screen.findByText("넘긴 액션은 원래 담당자에게 돌아갑니다.", { exact: false }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/되돌아오지 않습니다/)).not.toBeInTheDocument();
   });
 });
 

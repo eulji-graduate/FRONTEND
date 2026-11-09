@@ -154,10 +154,16 @@ export function HandoverApprovalCard({
         <h2 className="text-[17px] leading-7 font-semibold tracking-[-0.3px]">
           {applicantTypeLabel} {typeLabel} 최종 승인 대기
         </h2>
-        {/* ⚠️ 배지도 명도로 세운다 — 이 화면에서 제일 진한 표식이라 색 없이도 먼저 읽힌다 */}
-        <span className="bg-foreground text-background shrink-0 rounded px-2 py-0.5 text-[11px] leading-4 font-medium">
-          검토 필요
-        </span>
+        {/*
+          ⚠️ 배지도 명도로 세운다 — 이 화면에서 제일 진한 표식이라 색 없이도 먼저 읽힌다
+          ⚠️ **승인할 수 있는 사람에게만** 단다(디자인 시안 ③, #16). 겸직 관리자에게 "검토 필요"를
+             띄우면 할 일이 있다고 말하면서 아래에선 "대표만 할 수 있습니다"라고 해 서로 어긋난다.
+        */}
+        {canApprove && (
+          <span className="bg-foreground text-background shrink-0 rounded px-2 py-0.5 text-[11px] leading-4 font-medium">
+            검토 필요
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 px-7 pb-6">
@@ -333,6 +339,9 @@ export function HandoverApprovalCard({
         ⚠️ 반려는 되돌릴 수 없다 — **무엇이 일어나는지** 적고 한 번 더 받는다.
            휴직과 오프보딩은 되돌아가는 자리가 같지만(재직), 신청한 사람이 다시 밟을 절차가
            달라서 유형을 문장에 적는다.
+        ⚠️ **넘긴 액션은 돌아온다**(#16). 예전엔 오프보딩에 "되돌아오지 않습니다"라고 적었는데
+           BE는 반려 때 중간 승인으로 넘긴 액션을 원래 담당자에게 되돌린다
+           (`HandoverService.rollbackCommittedReassignments`) — 화면이 반대로 말하고 있었다.
         ⚠️ **사유도 이 창에서 받는다.** 전에는 카드 안에 붉은 칸이 펼쳐지고 그다음 확인 창이
            떠서, 같은 한 가지 일을 두 번 물었다 — 게다가 그 붉은 면은 "색으로 알리는 건
            에러뿐"(§디자인 토큰)에 어긋났다. 되돌릴 수 없는 일을 묻는 자리는 공용 확인 창
@@ -354,7 +363,7 @@ export function HandoverApprovalCard({
             <br />
             {isVacation
               ? "다시 신청하려면 인수인계부터 새로 밟아야 합니다."
-              : "이미 넘긴 액션은 되돌아오지 않습니다."}
+              : "넘긴 액션은 원래 담당자에게 돌아갑니다."}
           </>
         }
         confirmLabel="반려"
