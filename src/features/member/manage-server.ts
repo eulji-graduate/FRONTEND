@@ -1,7 +1,6 @@
 import "server-only";
 
-import type { Authority } from "@/constants/authority";
-import { HANDOVER_TYPE, type HandoverType } from "@/constants/handover";
+import { HANDOVER_TYPE, type HandoverType, toFinalizeBlockReason } from "@/constants/handover";
 import { isVisibleMemberStatus } from "@/constants/member";
 import { requireAccessToken } from "@/features/auth/session";
 import { getCompanyOrg } from "@/features/company/server";
@@ -10,6 +9,7 @@ import type { BePageResponse } from "@/features/project/mapper";
 import { ApiError, serverApi } from "@/lib/api";
 import { ep } from "@/lib/endpoints";
 import { paginate, type PaginatedResult } from "@/lib/paginate";
+import { type Actor, canApproveFinal } from "@/lib/permission";
 import { isMock } from "@/mocks/config";
 
 import { filterMembers, searchMembers } from "./manage-filter";
@@ -47,6 +47,13 @@ interface BeHandoverSummaryResponse {
   leaveStartAt: string | null;
   leaveEndAt: string | null;
   itemCount: number;
+  /*
+    [확인] BE `momo/handover-approval`(18cbbdb) — 조회자 기준 최종 승인 판정. ⚠️ develop 머지 전이다.
+    ⚠️ 필드가 아직 없는 BE면 `undefined`로 온다 — 그때는 잠근 쪽(`canFinalize` 거짓)으로 읽힌다.
+  */
+  canFinalize?: boolean;
+  requiresIntermediateApproval?: boolean;
+  finalizeBlockReason?: string | null;
 }
 
 /** [확인] BE `HandoverResponse` — 중간 승인자·시각만 본다(나머지는 목록 응답에 이미 있다). */
@@ -61,14 +68,11 @@ interface BeHandoverDetailForApproval {
  * 조회한다(`status=SUBMITTED`·`status=REASSIGNED`) — 전체 이력(FINALIZED·REJECTED
  * 포함)을 받아 오면 회사가 커질수록 이 화면 하나의 응답 크기가 계속 늘어난다.
  *
- * ⚠️ **신청 당시 권한 스냅샷을 BE가 안 준다.** `requesterAuthority`는 지금 권한
- *    (`currentAuthority`)으로 근사한다 — 팀장 공석 중 승급된 사람이 신청했다면 그때는
- *    일반 팀원이었어도 지금은 팀장으로 읽힌다(알려진 한계, mock은 신청 시점 값을 그대로
- *    굳혀 두지만 실 데이터엔 그 스냅샷이 없다).
+ * ⚠️ **최종 승인 가능 여부는 BE 판정을 그대로 옮긴다**(`canFinalize` 등). 예전엔 지금 권한과
+ *    중간 승인 여부로 여기서 추정했는데, BE 규칙(지금 그 팀 팀장인지)과 갈릴 수 있어 걷어냈다.
  */
 async function findPendingHandoverForMember(
   memberId: number,
-  currentAuthority: Authority,
   accessToken: string,
 ): Promise<PendingHandover | null> {
   const [submitted, reassigned] = await Promise.all([
@@ -103,7 +107,9 @@ async function findPendingHandoverForMember(
     period,
     actionCount: pending.itemCount,
     midApproval,
-    requesterAuthority: currentAuthority,
+    canFinalize: pending.canFinalize === true,
+    requiresIntermediateApproval: pending.requiresIntermediateApproval === true,
+    finalizeBlockReason: toFinalizeBlockReason(pending.finalizeBlockReason),
   };
 }
 
@@ -346,10 +352,17 @@ async function findMemberActions(
  *    목록에서 사라진 계정의 주소를 그대로 열 수 있고(탈퇴 직후 뒤로 가기가 흔한 길이다),
  *    상태 라벨이 빈칸으로 뜨는 데다 직급·권한 폼까지 열려서 **없는 사람에게 Admin 겸직을
  *    얹을 수 있다**. 액션들도 이 함수로 대상을 찾으므로 여기서 막으면 서버 재검사까지 함께 닫힌다.
+ * ⚠️ `viewer`는 **목 전용**이다 — 최종 승인 판정이 조회자마다 달라서다. 실서버는 토큰으로
+ *    조회자를 알아 BE가 판정해 준다. 안 넘기면 목은 대표가 아닌 것으로 본다(버튼이 잠긴다).
  */
-export async function getManagedMember(id: number): Promise<ManagedMemberDetail | null> {
+export async function getManagedMember(
+  id: number,
+  viewer?: Actor,
+): Promise<ManagedMemberDetail | null> {
   if (isMock) {
-    const found = findMockManagedMember(id);
+    const found = findMockManagedMember(id, {
+      isViewerOwner: viewer !== undefined && canApproveFinal(viewer),
+    });
     if (!found || !isVisibleMemberStatus(found.member.status)) return null;
 
     /*
@@ -396,7 +409,7 @@ export async function getManagedMember(id: number): Promise<ManagedMemberDetail 
        줄 세우면 이 화면이 두 번의 왕복만큼 늦게 뜬다.
   */
   const [pendingHandover, actions] = await Promise.all([
-    findPendingHandoverForMember(id, member.authority, accessToken),
+    findPendingHandoverForMember(id, accessToken),
     findMemberActions(id, accessToken),
   ]);
 

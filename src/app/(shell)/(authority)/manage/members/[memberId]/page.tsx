@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AccessDenied } from "@/components/common/access-denied";
-import { AUTHORITY } from "@/constants/authority";
 import { getCompanyOrg } from "@/features/company/server";
 import { HandoverApprovalCard } from "@/features/member/components/handover-approval-card";
 import { MemberActionList } from "@/features/member/components/member-action-list";
@@ -43,7 +42,8 @@ export default async function ManageMemberDetailPage({
   const viewer = await getViewer();
   if (!canManageMembers(viewer)) return <AccessDenied homeHref={roleHome(viewer.role)} />;
 
-  const detail = await getManagedMember(id);
+  /* ⚠️ `viewer`는 목에서만 쓴다 — 최종 승인 판정이 조회자마다 다르다(실서버는 BE가 판정) */
+  const detail = await getManagedMember(id, viewer);
   if (!detail) notFound();
 
   /*
@@ -96,13 +96,6 @@ export default async function ManageMemberDetailPage({
                 memberAuthority={detail.member.authority}
                 handover={detail.pendingHandover}
                 canApprove={canApproveFinal(viewer)}
-                /*
-                  ⚠️ **신청 당시** 권한을 쓴다(`pendingHandover.requesterAuthority`) —
-                     지금 권한(`detail.member.authority`)을 쓰면 팀장 공석 중 승급된
-                     사람의 예전 일반 팀원 신청이 "팀장 본인 신청"으로 잘못 보인다
-                     (CodeRabbit 지적, 2026-08-09).
-                */
-                isRequesterLeader={detail.pendingHandover.requesterAuthority === AUTHORITY.LEADER}
               />
             )}
 

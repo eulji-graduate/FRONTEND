@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AUTHORITY, type Authority } from "@/constants/authority";
 import {
+  FINALIZE_BLOCK_FALLBACK_LABEL,
+  FINALIZE_BLOCK_REASON_LABEL,
   HANDOVER_APPLICANT_TYPE_LABEL,
   HANDOVER_TYPE,
   HANDOVER_TYPE_LABEL,
@@ -27,14 +29,12 @@ interface HandoverApprovalCardProps {
   /** 제목에 "팀장/사원"을 붙이는 데만 쓴다 — 승인 판정과는 무관하다(그건 `canApprove`). */
   memberAuthority: Authority;
   handover: PendingHandover;
-  /** OWNER만 참이다 — Admin 겸직자는 화면엔 들어와도 이 버튼이 없다(WORKFLOW §11) */
-  canApprove: boolean;
   /**
-   * **신청 당시** 그 사람이 팀장이었는지(`handover.requesterAuthority` 기준) — 중간 승인
-   * 문구·귀속 안내 링크의 분기에 쓴다. `memberAuthority`(지금 권한, 제목용)와는 값이 갈릴
-   * 수 있다 — 팀장 공석 중 승급되면 신청 당시엔 일반 팀원이었어도 지금은 팀장이라서다.
+   * OWNER만 참이다 — Admin 겸직자는 화면엔 들어와도 버튼이 없다(WORKFLOW §11).
+   * ⚠️ **버튼을 그릴지**만 정한다. 최종 승인을 지금 누를 수 있는지는 `handover.canFinalize`
+   *    (BE 판정)가 정한다 — 반려는 그 값으로 잠그지 않는다.
    */
-  isRequesterLeader: boolean;
+  canApprove: boolean;
 }
 
 /**
@@ -64,7 +64,6 @@ export function HandoverApprovalCard({
   memberAuthority,
   handover,
   canApprove,
-  isRequesterLeader,
 }: HandoverApprovalCardProps) {
   const [reason, setReason] = useState("");
   /**
@@ -97,14 +96,24 @@ export function HandoverApprovalCard({
   const isVacation = handover.type === HANDOVER_TYPE.VACATION;
   const typeLabel = HANDOVER_TYPE_LABEL[handover.type];
   /*
-    ⚠️ **일반 팀원 신청은 중간 승인 전엔 최종 승인을 잠근다**(#6). 서버
-       (`approveHandoverAction`·BE `finalizeApproval`)가 같은 규칙으로 막는데, 화면이 버튼을
-       열어 두면 눌러 본 뒤에야 실패 문구를 만난다. 왜 잠겼는지는 바로 위 문장이 이미
-       말하므로 `aria-describedby`로 그 문장에 잇는다 — 이유 없는 회색 버튼이 아니다.
-    ⚠️ 반려는 열어 둔다 — 중간 승인과 무관하게 서버가 받는다.
+    ⚠️ **최종 승인은 BE 판정(`canFinalize`)으로만 잠근다.** 예전엔 권한·중간 승인으로 여기서
+       추정했는데(#6), BE 규칙(지금 그 팀 팀장인지)과 갈릴 수 있어 BE가 판정을 내려 주게
+       했다. 잠긴 이유는 BE 사유 코드를 문장으로 옮겨 버튼에 잇는다 — 이유 없는 회색 버튼이
+       아니다. 서버도 승인 요청 때 다시 막는다(조회 뒤 상태가 바뀔 수 있다).
+    ⚠️ 반려는 열어 둔다 — 최종 승인 판정과 무관하게 서버가 받는다.
   */
-  const isAwaitingMidApproval = !isRequesterLeader && !handover.midApproval;
-  const midStatusId = useId();
+  const finalizeBlockMessage = handover.canFinalize
+    ? null
+    : handover.finalizeBlockReason
+      ? FINALIZE_BLOCK_REASON_LABEL[handover.finalizeBlockReason]
+      : FINALIZE_BLOCK_FALLBACK_LABEL;
+  const blockReasonId = useId();
+  /*
+    ⚠️ **중간 승인 단계가 없는 신청**(지금 그 팀 팀장의 본인 신청)은 BE 값으로 가른다 —
+       중간 승인 기록도 없고 더 받을 필요도 없으면 그 길이다. 신청 당시 직책은 BE가 주지
+       않으므로 여기서 지어내지 않는다.
+  */
+  const isDirectLeaderPath = !handover.midApproval && !handover.requiresIntermediateApproval;
   /*
     ⚠️ **제목에 팀장/사원을 박아 넣는다**(사용자 확정, 2026-08-08) — 전에는 본문을 읽어야만
        팀장 본인 신청인지 알 수 있었다. "팀장 휴직"·"사원 오프보딩"처럼 넷을 한눈에
@@ -206,13 +215,10 @@ export function HandoverApprovalCard({
           ⚠️ 중간 승인 여부만 적는다. 팀장 본인 신청이면 중간 단계가 없어 `null`이고,
              그때 "중간 승인이 없다"가 아니라 **왜 없는지**를 적어야 빠뜨린 것처럼 안 읽힌다.
         */}
-        <p
-          id={midStatusId}
-          className="border-border bg-secondary/40 text-muted-foreground rounded-lg border px-4 py-3 text-[13px] leading-5 break-keep"
-        >
+        <p className="border-border bg-secondary/40 text-muted-foreground rounded-lg border px-4 py-3 text-[13px] leading-5 break-keep">
           {handover.midApproval
             ? `${handover.midApproval.approverName} 리더가 ${formatMonthDayWeekday(handover.midApproval.approvedAt)} 중간 승인했습니다.`
-            : isRequesterLeader
+            : isDirectLeaderPath
               ? isVacation
                 ? "팀장 본인 신청이라 중간 승인 단계 없이 올라왔습니다. 재할당은 본인이 마쳤습니다."
                 : "팀장 오프보딩이라 중간 승인 단계 없이 올라왔습니다. 승인 뒤 인수인계서를 새 팀장에게 귀속해야 합니다."
@@ -223,7 +229,7 @@ export function HandoverApprovalCard({
           ⚠️ 팀장 오프보딩은 승인이 끝이 아니다 — 인수인계서를 새 팀장에게 귀속해야 완결된다
              (WORKFLOW §7). 갈 곳을 여기서 알려 준다.
         */}
-        {isRequesterLeader && !isVacation && !handover.midApproval && (
+        {isDirectLeaderPath && !isVacation && (
           <Link
             href="/owner/leader-handovers"
             className="text-muted-foreground hover:text-foreground text-[12px] leading-4 underline underline-offset-2"
@@ -265,7 +271,19 @@ export function HandoverApprovalCard({
         )}
 
         {canApprove && (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+            {/*
+              ⚠️ **잠긴 이유를 버튼 옆에 적는다**(BE 사유 코드 → 문장). 프로젝트 생성 버튼과
+                 같은 문법이다(#18) — 버튼만 회색이면 왜 못 누르는지 모른다.
+            */}
+            {finalizeBlockMessage && (
+              <p
+                id={blockReasonId}
+                className="text-muted-foreground text-[12px] leading-4 break-keep"
+              >
+                {finalizeBlockMessage}
+              </p>
+            )}
             <Button
               type="button"
               size="sm"
@@ -284,8 +302,8 @@ export function HandoverApprovalCard({
               type="button"
               size="sm"
               variant="ink"
-              disabled={isPending || isAwaitingMidApproval}
-              aria-describedby={isAwaitingMidApproval ? midStatusId : undefined}
+              disabled={isPending || !handover.canFinalize}
+              aria-describedby={finalizeBlockMessage ? blockReasonId : undefined}
               onClick={() => {
                 setError(null);
                 setConfirming("approve");
