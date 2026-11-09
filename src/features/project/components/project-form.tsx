@@ -4,7 +4,7 @@ import { Check, Paperclip, Plus, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { ChangeEvent, CSSProperties } from "react";
-import { useActionState, useCallback, useEffect, useRef, useState } from "react";
+import { useActionState, useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
 import { DatePickerField } from "@/components/common/date-picker-field";
@@ -121,6 +121,13 @@ export function ProjectForm({ action, teamOptions, cancelHref }: ProjectFormProp
     dueDate.trim().length > 0 &&
     teamRows.length > 0 &&
     teamRows.every((row) => row.team.trim().length > 0);
+  /*
+    ⚠️ **잠근 이유를 버튼 옆에 적는다**(#18). 필수 칸이 비면 [프로젝트 생성]이 회색으로
+       잠기는데, 아무 말이 없으면 눌러도 안 되는 버튼이 고장 난 것처럼 보인다 — `*` 표시만으로는
+       "다 채워야 열린다"까지 읽히지 않는다. 화면 낭독기도 같은 문장을 읽게 버튼에 잇는다.
+  */
+  const isWaitingForRequired = !canSubmit && !isCreated;
+  const submitHintId = useId();
   /*
     ⚠️ **첨부 오류가 제출을 막지 않는다**(2026-08-13 고침). 전에는 `!attachmentError`가
        `canSubmit`에 있었는데, 파일이 검증에 걸리면 `attachment`는 `null`이 되고 오류만 남아
@@ -542,6 +549,11 @@ export function ProjectForm({ action, teamOptions, cancelHref }: ProjectFormProp
 
       {/* ⚠️ 제출은 **두 칸 아래 한 줄**이다 — 곁 칸에 붙이면 본문을 다 적기 전에 눈에 들어온다 */}
       <div className="border-border flex justify-end gap-2 border-t pt-5">
+        {isWaitingForRequired && (
+          <p id={submitHintId} className="text-muted-foreground self-center text-[12px] leading-4">
+            필수 항목(*)을 모두 채우면 만들 수 있습니다.
+          </p>
+        )}
         <Link href={cancelHref} className={buttonVariants({ variant: "outline", size: "sm" })}>
           취소
         </Link>
@@ -550,6 +562,7 @@ export function ProjectForm({ action, teamOptions, cancelHref }: ProjectFormProp
           size="sm"
           /* ⚠️ 만들어진 뒤에는 잠근다 — 업로드가 실패한 채 또 제출하면 프로젝트가 두 개 생긴다 */
           disabled={isPending || !canSubmit || isCreated}
+          aria-describedby={isWaitingForRequired ? submitHintId : undefined}
           className="bg-foreground text-background hover:bg-foreground/90"
         >
           {isPending ? "생성 중…" : isUploading ? "파일 올리는 중…" : "프로젝트 생성"}
