@@ -63,7 +63,9 @@ describe("HandoverApprovalCard — 겸직 관리자", () => {
 });
 
 describe("HandoverApprovalCard — 반려 안내", () => {
-  it("오프보딩 반려 창은 넘긴 액션이 원래 담당자에게 돌아간다고 적는다", async () => {
+  const RETURN_COPY = "인계된 액션은 원래 담당자에게 돌아갑니다.";
+
+  it("오프보딩 반려 창은 인계된 액션이 원래 담당자에게 돌아간다고 적는다", async () => {
     const user = userEvent.setup();
     renderCard({
       ...BASE,
@@ -74,10 +76,19 @@ describe("HandoverApprovalCard — 반려 안내", () => {
 
     await user.click(screen.getByRole("button", { name: "반려" }));
 
-    expect(
-      await screen.findByText("넘긴 액션은 원래 담당자에게 돌아갑니다.", { exact: false }),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(RETURN_COPY, { exact: false })).toBeInTheDocument();
     expect(screen.queryByText(/되돌아오지 않습니다/)).not.toBeInTheDocument();
+  });
+
+  /* ⚠️ BE는 휴직 반려 때도 인계된 액션을 되돌린다 — 휴직 창도 같은 문장이다 */
+  it("휴직 반려 창도 같은 문장을 적는다", async () => {
+    const user = userEvent.setup();
+    renderCard(BASE);
+
+    await user.click(screen.getByRole("button", { name: "반려" }));
+
+    expect(await screen.findByText(RETURN_COPY, { exact: false })).toBeInTheDocument();
+    expect(screen.queryByText(/인수인계부터 새로 밟아야/)).not.toBeInTheDocument();
   });
 });
 
