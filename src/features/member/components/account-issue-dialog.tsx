@@ -52,6 +52,7 @@ import type { TeamRoleOption } from "../team-roles";
 export function AccountIssueDialog({
   teamNames,
   positionNames,
+  defaultPositionName,
   teamRoles,
 }: {
   teamNames: string[];
@@ -60,13 +61,15 @@ export function AccountIssueDialog({
    * ⚠️ 손으로 적게 두면 회사에 없는 직급이 생긴다 — 직급에는 권한이 매여 있다.
    */
   positionNames: string[];
+  /** 직급 기본값 — Member 직급 중 가장 낮은 것(`pickDefaultPositionName`, #30) */
+  defaultPositionName: string;
   /** 팀 이름 → 그 팀의 역할들. 역할은 팀에 매여 있다(`team-roles`) */
   teamRoles: Record<string, TeamRoleOption[]>;
 }) {
   const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [draft, setDraft] = useState<AccountDraft>(() =>
-    emptyDraft(teamNames, positionNames, teamRoles),
+    emptyDraft(teamNames, defaultPositionName, teamRoles),
   );
   const [errors, setErrors] = useState<AccountErrors>({});
   const [message, setMessage] = useState<string | null>(null);
@@ -88,7 +91,7 @@ export function AccountIssueDialog({
   };
 
   const reset = () => {
-    setDraft(emptyDraft(teamNames, positionNames, teamRoles));
+    setDraft(emptyDraft(teamNames, defaultPositionName, teamRoles));
     setErrors({});
     setMessage(null);
   };
@@ -492,7 +495,7 @@ export function AccountIssueDialog({
 /** 팀이 하나뿐이면 고를 것도 없으니 첫 팀을 미리 넣어 둔다 */
 function emptyDraft(
   teamNames: string[],
-  positionNames: string[],
+  defaultPositionName: string,
   teamRoles: Record<string, TeamRoleOption[]>,
 ): AccountDraft {
   const teamName = teamNames[0] ?? "";
@@ -500,7 +503,8 @@ function emptyDraft(
     name: "",
     email: "",
     teamName,
-    position: positionNames[0] ?? "",
+    // ⚠️ 첫 번째(=팀장)가 아니다 — 권한 기본값(Member)과 같은 쪽 직급이다(#30)
+    position: defaultPositionName,
     authority: AUTHORITY.MEMBER,
     // ⚠️ 겸직은 **기본 꺼짐**이다. 권한을 주는 값이라 미리 켜 두면 확인 없이 나간다
     isAdmin: false,

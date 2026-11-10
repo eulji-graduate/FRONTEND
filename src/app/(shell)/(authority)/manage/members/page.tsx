@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { AccessDenied } from "@/components/common/access-denied";
 import { getCompanyOrg } from "@/features/company/server";
 import { MemberListView } from "@/features/member/components/member-list-view";
+import { pickDefaultPositionName } from "@/features/member/default-position";
 import { getManagedMembersPage } from "@/features/member/manage-server";
 import { MEMBER_FILTER, type MemberFilter, type MemberQuery } from "@/features/member/manage-types";
 import { buildTeamRoles } from "@/features/member/team-roles";
@@ -87,6 +88,7 @@ export default async function ManageMembersPage({
       canIssueAccount={canIssueAccount(viewer)}
       teamNames={teamNames}
       positionNames={company.positions.map((position) => position.name)}
+      defaultPositionName={pickDefaultPositionName(company.positions)}
       teamRoles={buildTeamRoles(company.departments)}
     />
   );
