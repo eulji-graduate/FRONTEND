@@ -51,6 +51,7 @@ export function MemberListView({
   canIssueAccount,
   teamNames,
   positionNames,
+  defaultPositionName,
   teamRoles,
 }: {
   initialItems: ManagedMember[];
@@ -64,6 +65,8 @@ export function MemberListView({
   teamNames: string[];
   /** 회사가 만든 직급 이름들 — 발급 창이 이 안에서만 고르게 한다 */
   positionNames: string[];
+  /** 발급 창의 직급 기본값(#30) */
+  defaultPositionName: string;
   /** 팀 이름 → 그 팀의 역할들. 역할은 팀에 매여 있다 */
   teamRoles: Record<string, TeamRoleOption[]>;
 }) {
@@ -189,6 +192,7 @@ export function MemberListView({
                 <AccountIssueDialog
                   teamNames={teamNames}
                   positionNames={positionNames}
+                  defaultPositionName={defaultPositionName}
                   teamRoles={teamRoles}
                 />
               )}
