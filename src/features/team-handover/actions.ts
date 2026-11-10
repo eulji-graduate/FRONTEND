@@ -5,9 +5,9 @@ import { revalidatePath } from "next/cache";
 import { requireAccessToken } from "@/features/auth/session";
 import {
   completeMockHandoverMidApproval,
+  reassignMockHandoverAction,
   rejectMockHandover,
 } from "@/features/member/mock/managed";
-import { TEAM_ACTION_PERSONAL_ITEMS_MOCK } from "@/features/project/mock/team-action-detail";
 import { getViewer } from "@/features/shell/viewer";
 import { ApiError, serverApi } from "@/lib/api";
 import { todayIso } from "@/lib/date";
@@ -16,18 +16,10 @@ import { canApproveMid } from "@/lib/permission";
 import { isMock } from "@/mocks/config";
 
 import { getTeamHandoverDetail } from "./server";
-import type { TeamHandoverAssignment, TeamMemberOption } from "./types";
+import type { TeamHandoverAssignment } from "./types";
 
 const LIST_PATH = "/team/handover";
 const MANAGE_PATH = "/manage/members";
-
-function findPersonalItem(actionId: number) {
-  for (const items of Object.values(TEAM_ACTION_PERSONAL_ITEMS_MOCK)) {
-    const found = items.find((item) => item.id === actionId);
-    if (found) return found;
-  }
-  return null;
-}
 
 /**
  * 액션 하나를 재배정한다 — BE는 건별 `PATCH /api/handovers/{id}/items/{actionId}/reassign`로
@@ -35,15 +27,9 @@ function findPersonalItem(actionId: number) {
  * 지금은 mock이라 로컬 mutate 한 건이지만, **실연동 시 이 함수 내부만 실 API 호출로 바꾸면**
  * `completeTeamHandoverAction`의 순회 구조는 그대로 쓴다.
  */
-function reassignHandoverItem(
-  assignment: TeamHandoverAssignment,
-  teammateById: Map<number, TeamMemberOption>,
-): void {
-  const teammate = teammateById.get(assignment.assigneeId);
-  const item = findPersonalItem(assignment.actionId);
-  if (!teammate || !item) return;
-  item.assigneeName = teammate.name;
-  item.assigneeRoleLabel = teammate.roleLabel ?? undefined;
+function reassignHandoverItem(requesterId: number, assignment: TeamHandoverAssignment): void {
+  /* ⚠️ 목 인계 액션 id는 BE id(101)로 내려간다(`team-handover/server.ts`) — 저장소는 `a-101`로 든다 */
+  reassignMockHandoverAction(requesterId, `a-${assignment.actionId}`, assignment.assigneeId);
 }
 
 /**
@@ -86,8 +72,8 @@ export async function commitHandoverReassignments(
 /**
  * [인수인계 확정] — 팀원 보드로 재배정한 결과를 한 번에 반영하고 팀장 중간 승인을 남긴다
  * (WORKFLOW.md §7·§13-4).
- * ⚠️ **재배정 반영은 `board/actions.ts`와 같은 방식**이다(mock) — `TEAM_ACTION_PERSONAL_ITEMS_MOCK`
- *    항목을 직접 mutate한다(별도 격리 저장소를 새로 두지 않는다).
+ * ⚠️ **재배정은 사원 목(`member/mock/managed.ts`)에 반영한다**(#27) — 인계 액션을 그 목에서
+ *    읽으므로 옮기는 곳도 같아야 한다. 반려하면 그 기록으로 되돌아온다(BE와 같다).
  * ⚠️ **실서버 분기만 팀 스코프를 검사한다**(2026-08-15) — mock 로스터엔 숫자 팀 id가 없어
  *    (`server.ts`의 `teamId: 0` 참고) `canApproveMid`의 teamId 대조를 mock에서 그대로
  *    쓸 수 없다. 대신 `getViewer().teamName`으로 mock 데이터를 좁힌다(#678과 같은 이유로
@@ -148,7 +134,7 @@ export async function completeTeamHandoverAction(
 
   if (isMock) {
     for (const assignment of assignments) {
-      reassignHandoverItem(assignment, teammateById);
+      reassignHandoverItem(handover.memberId, assignment);
     }
     completeMockHandoverMidApproval(handoverId, viewer.name, todayIso());
   } else {

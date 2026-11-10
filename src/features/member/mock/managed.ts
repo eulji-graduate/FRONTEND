@@ -464,7 +464,46 @@ export function completeMockHandoverMidApproval(
   );
 }
 
-/** 반려 — 신청을 치우고 사람은 재직으로 되돌린다 */
+/**
+ * 인계 대상 액션 — 신청자가 들고 있는 **미완료** 액션(#27).
+ * ⚠️ BE 시드(인수인계 301)도 미완료 101·102·106만 담는다 — 완료(a-103)는 넘길 일이 없다.
+ */
+export function listMockHandoverActions(memberId: number): ManagedMemberAction[] {
+  const entry = store.find((candidate) => candidate.member.id === memberId);
+  if (!entry) return [];
+  return clone(entry.actions).filter((action) => action.status !== ACTION_STATUS.DONE);
+}
+
+/**
+ * 팀장 재배정 한 건 — 신청자의 액션을 팀원에게 옮기고, 반려 때 되돌릴 기록을 남긴다(#27).
+ * ⚠️ BE도 재배정을 그 자리에서 반영하고 반려 때 되돌린다(`rollbackCommittedReassignments`) —
+ *    기록(`handedOver`)을 안 남기면 반려해도 일이 안 돌아온다(`rejectMockHandover`).
+ */
+export function reassignMockHandoverAction(
+  requesterId: number,
+  actionId: string,
+  toMemberId: number,
+): void {
+  const requester = store.find((entry) => entry.member.id === requesterId);
+  const action = requester?.actions.find((candidate) => candidate.id === actionId);
+  if (!requester || !action || requesterId === toMemberId) return;
+  if (!store.some((entry) => entry.member.id === toMemberId)) return;
+
+  store = store.map((entry) => {
+    if (entry.member.id === requesterId) {
+      return {
+        ...entry,
+        actions: entry.actions.filter((candidate) => candidate.id !== actionId),
+        handedOver: [...(entry.handedOver ?? []), { actionId, toMemberId }],
+      };
+    }
+    if (entry.member.id === toMemberId) {
+      return { ...entry, actions: [...entry.actions, action] };
+    }
+    return entry;
+  });
+}
+
 /**
  * 반려 — 신청자를 재직으로 되돌리고, **중간 승인으로 넘어간 액션을 원래 담당자에게 돌려준다**.
  * ⚠️ BE와 같은 결과여야 한다(`HandoverService.reject` → `rollbackCommittedReassignments`) —
