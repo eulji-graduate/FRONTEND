@@ -1,4 +1,9 @@
+import { createMockClock } from "@/mocks/rebase-date";
+
 import { CALENDAR_ITEM_TAG, type PersonalCalendarEvent, type PersonalTodoDraft } from "../types";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-05다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-05");
 
 /**
  * ⚠️ 목 데이터 — BE 연동 전. **서버 프로세스 메모리에만 있다**(재시작하면 초기값으로 되돌아간다).
@@ -16,24 +21,24 @@ const INITIAL: PersonalCalendarEvent[] = [
   {
     id: "todo-1",
     title: "주간 보고서 작성",
-    start: new Date("2026-08-05T10:00:00"),
-    end: new Date("2026-08-05T11:00:00"),
+    start: clock.date("2026-08-05T10:00:00"),
+    end: clock.date("2026-08-05T11:00:00"),
     tag: CALENDAR_ITEM_TAG.PERSONAL_TODO,
     isCompleted: false,
   },
   {
     id: "action-1",
     title: "회의실 예약 정책 공유",
-    start: new Date("2026-08-05T14:00:00"),
-    end: new Date("2026-08-08T15:00:00"),
+    start: clock.date("2026-08-05T14:00:00"),
+    end: clock.date("2026-08-08T15:00:00"),
     tag: CALENDAR_ITEM_TAG.PERSONAL_ACTION,
     isCompleted: false,
   },
   {
     id: "todo-2",
     title: "회의실 예약",
-    start: new Date("2026-08-07T09:00:00"),
-    end: new Date("2026-08-07T09:30:00"),
+    start: clock.date("2026-08-07T09:00:00"),
+    end: clock.date("2026-08-07T09:30:00"),
     tag: CALENDAR_ITEM_TAG.PERSONAL_TODO,
     isCompleted: true,
   },

@@ -1,6 +1,7 @@
 import { ACTION_STATUS, type ActionStatus } from "@/constants/action";
 import { AUTHORITY } from "@/constants/authority";
 import { AI_SUMMARY_STATUS } from "@/constants/meeting";
+import { createMockClock } from "@/mocks/rebase-date";
 
 import type { ScriptChunk } from "../view-types";
 import {
@@ -10,6 +11,9 @@ import {
   listMockMeetings,
   setMockSummaryStatus,
 } from "./meetings";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-11다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-11");
 
 /**
  * 회의 목 시드 — **화면을 만들 수 있게 회의 몇 건을 미리 깔아 둔다.**
@@ -67,8 +71,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const kickoff = addMockMeeting({
     title: "연예인 굿즈 쇼핑몰 앱 구축 킥오프",
-    start: new Date("2026-07-14T10:00:00+09:00"),
-    end: new Date("2026-07-14T10:30:00+09:00"),
+    start: clock.date("2026-07-14T10:00:00+09:00"),
+    end: clock.date("2026-07-14T10:30:00+09:00"),
     roomId: "room-large",
     roomName: "대회의실",
     projectId: 1,
@@ -89,7 +93,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  endMockMeeting(kickoff.id, "2026-07-14T10:31:00.000Z");
+  endMockMeeting(kickoff.id, clock.at("2026-07-14T10:31:00.000Z"));
   /*
     ⚠️ 시드의 옛 완료 회의는 **분배까지 끝났다.** 종료가 대기로 넣기 때문에 그대로 두면
        회의록·산출물이 다 있는 회의가 "요약 중"으로 떠서 못 열린다.
@@ -112,8 +116,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const teamKickoff = addMockMeeting({
     title: "앱 개발 착수 팀 액션 회의",
-    start: new Date("2026-07-21T10:00:00+09:00"),
-    end: new Date("2026-07-21T10:30:00+09:00"),
+    start: clock.date("2026-07-21T10:00:00+09:00"),
+    end: clock.date("2026-07-21T10:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 1,
@@ -129,7 +133,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  endMockMeeting(teamKickoff.id, "2026-07-21T10:32:00.000Z");
+  endMockMeeting(teamKickoff.id, clock.at("2026-07-21T10:32:00.000Z"));
   setMockSummaryStatus(teamKickoff.id, AI_SUMMARY_STATUS.DISTRIBUTED);
   extras.set(teamKickoff.id, {
     script: [
@@ -139,9 +143,9 @@ export function ensureMockMeetingsSeeded(): void {
       { at: "10:26", text: "마감은 팀 액션 마감에 맞추고, 막히면 바로 공유해 주세요." },
     ],
     outputPersonalActions: [
-      { id: 1, status: ACTION_STATUS.IN_PROGRESS, dueDate: "2026-08-05" },
-      { id: 2, status: ACTION_STATUS.TODO, dueDate: "2026-08-07" },
-      { id: 3, status: ACTION_STATUS.DONE, dueDate: "2026-07-25" },
+      { id: 1, status: ACTION_STATUS.IN_PROGRESS, dueDate: clock.at("2026-08-05") },
+      { id: 2, status: ACTION_STATUS.TODO, dueDate: clock.at("2026-08-07") },
+      { id: 3, status: ACTION_STATUS.DONE, dueDate: clock.at("2026-07-25") },
     ],
   });
 
@@ -151,8 +155,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   addMockMeeting({
     title: "굿즈 앱 주간 운영 점검",
-    start: new Date("2026-08-14T10:00:00+09:00"),
-    end: new Date("2026-08-14T10:30:00+09:00"),
+    start: clock.date("2026-08-14T10:00:00+09:00"),
+    end: clock.date("2026-08-14T10:30:00+09:00"),
     roomId: "room-large",
     roomName: "대회의실",
     projectId: 1,
@@ -175,9 +179,9 @@ export function ensureMockMeetingsSeeded(): void {
     ⚠️ 지난 날짜로 잡는다. 미래로 잡으면 그날이 오기 전까지는 예정으로 뜬다.
   */
   addMockMeeting({
-    title: "굿즈 앱 8월 스프린트 점검",
-    start: new Date("2026-08-10T09:00:00+09:00"),
-    end: new Date("2026-08-10T09:30:00+09:00"),
+    title: "굿즈 앱 스프린트 점검",
+    start: clock.date("2026-08-10T09:00:00+09:00"),
+    end: clock.date("2026-08-10T09:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 1,
@@ -197,8 +201,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const brand = addMockMeeting({
     title: "3분기 브랜드 리뉴얼 킥오프",
-    start: new Date("2026-07-28T14:00:00+09:00"),
-    end: new Date("2026-07-28T14:30:00+09:00"),
+    start: clock.date("2026-07-28T14:00:00+09:00"),
+    end: clock.date("2026-07-28T14:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 2,
@@ -211,7 +215,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  endMockMeeting(brand.id, "2026-07-28T14:29:00.000Z");
+  endMockMeeting(brand.id, clock.at("2026-07-28T14:29:00.000Z"));
   /*
     ⚠️ 이 한 건만 **요약 중**으로 둔다. 종료 직후 몇 분 동안만 보이는 상태라 목에 하나
        세워 두지 않으면 그 카드를 만들었는지조차 화면에서 확인할 수 없다(§정직한 목업).
@@ -232,8 +236,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const pendingReview = addMockMeeting({
     title: "굿즈 앱 배송 정책 협의",
-    start: new Date("2026-08-04T11:00:00+09:00"),
-    end: new Date("2026-08-04T11:30:00+09:00"),
+    start: clock.date("2026-08-04T11:00:00+09:00"),
+    end: clock.date("2026-08-04T11:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 1,
@@ -246,7 +250,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  endMockMeeting(pendingReview.id, "2026-08-04T11:31:00.000Z");
+  endMockMeeting(pendingReview.id, clock.at("2026-08-04T11:31:00.000Z"));
   setMockSummaryStatus(pendingReview.id, AI_SUMMARY_STATUS.REVIEWED);
   extras.set(pendingReview.id, {
     script: [
@@ -261,8 +265,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const stalled = addMockMeeting({
     title: "굿즈 앱 결제 오류 대응 회의",
-    start: new Date("2026-08-06T15:00:00+09:00"),
-    end: new Date("2026-08-06T15:30:00+09:00"),
+    start: clock.date("2026-08-06T15:00:00+09:00"),
+    end: clock.date("2026-08-06T15:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 1,
@@ -275,7 +279,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  endMockMeeting(stalled.id, "2026-08-06T15:31:00.000Z");
+  endMockMeeting(stalled.id, clock.at("2026-08-06T15:31:00.000Z"));
   setMockSummaryStatus(stalled.id, AI_SUMMARY_STATUS.FAILED);
   extras.set(stalled.id, { script: [], isStalled: true });
 
@@ -286,8 +290,8 @@ export function ensureMockMeetingsSeeded(): void {
   */
   const canceled = addMockMeeting({
     title: "굿즈 앱 프로모션 협의",
-    start: new Date("2026-08-20T13:00:00+09:00"),
-    end: new Date("2026-08-20T13:30:00+09:00"),
+    start: clock.date("2026-08-20T13:00:00+09:00"),
+    end: clock.date("2026-08-20T13:30:00+09:00"),
     roomId: "room-small",
     roomName: "소회의실",
     projectId: 1,
@@ -300,7 +304,7 @@ export function ensureMockMeetingsSeeded(): void {
     isOnline: false,
     recordingFileName: null,
   });
-  cancelMockMeeting(canceled.id, "2026-08-11T09:00:00.000Z");
+  cancelMockMeeting(canceled.id, clock.at("2026-08-11T09:00:00.000Z"));
 }
 
 /** 테스트 전용 — 시드를 되돌린다(스토어는 `meetings.ts`가 들고 있어 함께 비운다) */

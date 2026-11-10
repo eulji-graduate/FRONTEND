@@ -1,4 +1,9 @@
+import { createMockClock } from "@/mocks/rebase-date";
+
 import type { PersonalActionDetail } from "../types";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-11다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-11");
 
 /**
  * ⚠️ 목 데이터 — BE 연동 전(ERD·API 스펙 미확정). 개인 액션 상세(`/app/actions/:actionId`)에 쓴다.
@@ -17,8 +22,17 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     projectTag: "GOODS",
     assigneeName: "이하윤",
     assigneeRoleLabel: "프론트엔드",
-    sourceMeeting: { id: 1, title: "앱 개발 착수 팀 액션 회의", scheduledAt: "2026-07-21T10:00" },
-    parentTeamAction: { id: 1, name: "앱 개발 착수", team: "개발팀", dueDate: "2026-08-29" },
+    sourceMeeting: {
+      id: 1,
+      title: "앱 개발 착수 팀 액션 회의",
+      scheduledAt: clock.at("2026-07-21T10:00"),
+    },
+    parentTeamAction: {
+      id: 1,
+      name: "앱 개발 착수",
+      team: "개발팀",
+      dueDate: clock.at("2026-08-29"),
+    },
   },
   2: {
     id: 2,
@@ -29,8 +43,17 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     projectTag: "GOODS",
     assigneeName: "박도현",
     assigneeRoleLabel: "백엔드",
-    sourceMeeting: { id: 2, title: "앱 개발 착수 팀 액션 회의", scheduledAt: "2026-07-21T10:00" },
-    parentTeamAction: { id: 1, name: "앱 개발 착수", team: "개발팀", dueDate: "2026-08-29" },
+    sourceMeeting: {
+      id: 2,
+      title: "앱 개발 착수 팀 액션 회의",
+      scheduledAt: clock.at("2026-07-21T10:00"),
+    },
+    parentTeamAction: {
+      id: 1,
+      name: "앱 개발 착수",
+      team: "개발팀",
+      dueDate: clock.at("2026-08-29"),
+    },
   },
   3: {
     id: 3,
@@ -41,8 +64,17 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     projectTag: "GOODS",
     assigneeName: "김서준",
     assigneeRoleLabel: "팀장",
-    sourceMeeting: { id: 3, title: "앱 개발 착수 팀 액션 회의", scheduledAt: "2026-07-21T10:00" },
-    parentTeamAction: { id: 1, name: "앱 개발 착수", team: "개발팀", dueDate: "2026-08-29" },
+    sourceMeeting: {
+      id: 3,
+      title: "앱 개발 착수 팀 액션 회의",
+      scheduledAt: clock.at("2026-07-21T10:00"),
+    },
+    parentTeamAction: {
+      id: 1,
+      name: "앱 개발 착수",
+      team: "개발팀",
+      dueDate: clock.at("2026-08-29"),
+    },
   },
   4: {
     id: 4,
@@ -56,9 +88,14 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 4,
       title: "결제 시스템 연동 팀 액션 회의",
-      scheduledAt: "2026-08-11T10:00",
+      scheduledAt: clock.at("2026-08-11T10:00"),
     },
-    parentTeamAction: { id: 2, name: "결제 시스템 연동", team: "개발팀", dueDate: "2026-09-12" },
+    parentTeamAction: {
+      id: 2,
+      name: "결제 시스템 연동",
+      team: "개발팀",
+      dueDate: clock.at("2026-09-12"),
+    },
   },
   5: {
     id: 5,
@@ -72,13 +109,13 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 9,
       title: "TV 광고 계약 및 모델 섭외 팀 액션 회의",
-      scheduledAt: "2026-08-11T13:00",
+      scheduledAt: clock.at("2026-08-11T13:00"),
     },
     parentTeamAction: {
       id: 3,
       name: "TV 광고 계약 및 모델 섭외",
       team: "마케팅팀",
-      dueDate: "2026-08-22",
+      dueDate: clock.at("2026-08-22"),
     },
   },
   6: {
@@ -93,13 +130,13 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 5,
       title: "굿즈 디자인 시안 제작 팀 액션 회의",
-      scheduledAt: "2026-07-21T15:00",
+      scheduledAt: clock.at("2026-07-21T15:00"),
     },
     parentTeamAction: {
       id: 4,
       name: "굿즈 디자인 시안 제작",
       team: "디자인팀",
-      dueDate: "2026-08-22",
+      dueDate: clock.at("2026-08-22"),
     },
   },
   7: {
@@ -114,13 +151,13 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 6,
       title: "로고·가이드라인 개편 팀 액션 회의",
-      scheduledAt: "2026-08-01T14:00",
+      scheduledAt: clock.at("2026-08-01T14:00"),
     },
     parentTeamAction: {
       id: 5,
       name: "로고·가이드라인 개편",
       team: "디자인팀",
-      dueDate: "2026-08-20",
+      dueDate: clock.at("2026-08-20"),
     },
   },
   8: {
@@ -135,9 +172,14 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 7,
       title: "캠페인 자산 제작 팀 액션 회의",
-      scheduledAt: "2026-08-15T14:00",
+      scheduledAt: clock.at("2026-08-15T14:00"),
     },
-    parentTeamAction: { id: 6, name: "캠페인 자산 제작", team: "마케팅팀", dueDate: "2026-09-12" },
+    parentTeamAction: {
+      id: 6,
+      name: "캠페인 자산 제작",
+      team: "마케팅팀",
+      dueDate: clock.at("2026-09-12"),
+    },
   },
   9: {
     id: 9,
@@ -151,9 +193,14 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 8,
       title: "협업툴 리뉴얼 착수 팀 액션 회의",
-      scheduledAt: "2026-07-25T11:00",
+      scheduledAt: clock.at("2026-07-25T11:00"),
     },
-    parentTeamAction: { id: 7, name: "협업툴 리뉴얼 착수", team: "개발팀", dueDate: "2026-08-25" },
+    parentTeamAction: {
+      id: 7,
+      name: "협업툴 리뉴얼 착수",
+      team: "개발팀",
+      dueDate: clock.at("2026-08-25"),
+    },
   },
   10: {
     id: 10,
@@ -167,13 +214,13 @@ export const PERSONAL_ACTION_DETAIL_MOCK: Record<number, PersonalActionDetail> =
     sourceMeeting: {
       id: 10,
       title: "회의·문서·일정 흐름 통합 설계 팀 액션 회의",
-      scheduledAt: "2026-08-10T14:00",
+      scheduledAt: clock.at("2026-08-10T14:00"),
     },
     parentTeamAction: {
       id: 8,
       name: "회의·문서·일정 흐름 통합 설계",
       team: "전략기획팀",
-      dueDate: "2026-09-19",
+      dueDate: clock.at("2026-09-19"),
     },
   },
 };

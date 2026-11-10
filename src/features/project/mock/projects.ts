@@ -1,6 +1,10 @@
 import { PROJECT_STATUS } from "@/constants/domain";
+import { createMockClock } from "@/mocks/rebase-date";
 
 import type { ProjectDraft, ProjectListItem } from "../types";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-11다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-11");
 
 /**
  * ⚠️ 목 데이터 — BE 연동 전(ERD·API 스펙 미확정, DECISIONS.md).
@@ -20,8 +24,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["개발팀", "마케팅팀", "디자인팀"],
     actionTotal: 11,
     actionDone: 0,
-    startDate: "2026-07-15",
-    dueDate: "2026-09-05",
+    startDate: clock.at("2026-07-15"),
+    dueDate: clock.at("2026-09-05"),
     status: PROJECT_STATUS.IN_PROGRESS,
   },
   {
@@ -34,8 +38,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["마케팅팀", "디자인팀"],
     actionTotal: 4,
     actionDone: 0,
-    startDate: "2026-07-20",
-    dueDate: "2026-09-12",
+    startDate: clock.at("2026-07-20"),
+    dueDate: clock.at("2026-09-12"),
     status: PROJECT_STATUS.IN_PROGRESS,
   },
   {
@@ -48,8 +52,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["개발팀", "전략기획팀"],
     actionTotal: 4,
     actionDone: 0,
-    startDate: "2026-07-10",
-    dueDate: "2026-09-19",
+    startDate: clock.at("2026-07-10"),
+    dueDate: clock.at("2026-09-19"),
     status: PROJECT_STATUS.IN_PROGRESS,
   },
   /*
@@ -69,8 +73,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["개발팀", "전략기획팀"],
     actionTotal: 6,
     actionDone: 0,
-    startDate: "2026-09-01",
-    dueDate: "2026-10-24",
+    startDate: clock.at("2026-09-01"),
+    dueDate: clock.at("2026-10-24"),
     status: PROJECT_STATUS.TODO,
   },
   {
@@ -83,8 +87,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["마케팅팀", "디자인팀"],
     actionTotal: 5,
     actionDone: 0,
-    startDate: "2026-08-24",
-    dueDate: "2026-10-10",
+    startDate: clock.at("2026-08-24"),
+    dueDate: clock.at("2026-10-10"),
     status: PROJECT_STATUS.TODO,
   },
   {
@@ -97,8 +101,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["전략기획팀"],
     actionTotal: 7,
     actionDone: 7,
-    startDate: "2026-06-01",
-    dueDate: "2026-07-10",
+    startDate: clock.at("2026-06-01"),
+    dueDate: clock.at("2026-07-10"),
     status: PROJECT_STATUS.DONE,
   },
   {
@@ -111,8 +115,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["개발팀", "전략기획팀"],
     actionTotal: 4,
     actionDone: 4,
-    startDate: "2026-06-15",
-    dueDate: "2026-07-31",
+    startDate: clock.at("2026-06-15"),
+    dueDate: clock.at("2026-07-31"),
     status: PROJECT_STATUS.DONE,
   },
   /*
@@ -133,8 +137,8 @@ export const TOP_LEVEL_PROJECTS: ProjectListItem[] = [
     departments: ["개발팀"],
     actionTotal: 3,
     actionDone: 1,
-    startDate: "2026-07-01",
-    dueDate: "2026-08-07",
+    startDate: clock.at("2026-07-01"),
+    dueDate: clock.at("2026-08-07"),
     status: PROJECT_STATUS.IN_PROGRESS,
   },
 ];

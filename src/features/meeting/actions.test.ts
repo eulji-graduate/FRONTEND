@@ -8,6 +8,7 @@ jest.mock("@/lib/mock-actor", () => ({
   getMockActor: jest.fn(() => ({ id: 1, role: "OWNER" })),
 }));
 
+import { findMockReservation } from "../rooms/mock/reservations";
 import {
   createOnlineMeetingAction,
   getOnlineMeetingRecordingUploadUrlAction,
@@ -346,15 +347,21 @@ describe("회의 시간·회의실·프로젝트·녹음 동의 수정(#436) —
 
   it("이미 다른 회의가 예약된 회의실·시간이면 막는다(시드 예약-2와 겹침)", async () => {
     const meeting = seedMeeting({ hostAuthority: "OWNER" });
+    // 시드 reservation-2(room-large, 30분)의 날짜·시각을 목에서 읽는다 — 목 날짜는 오늘 기준으로 옮겨지므로
+    // (`mocks/rebase-date.ts`) 날짜를 테스트에 박으면 낡는다.
+    const seeded = findMockReservation("reservation-2");
+    if (!seeded) throw new Error("시드 예약-2가 없다");
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const seededDate = `${seeded.start.getFullYear()}-${pad(seeded.start.getMonth() + 1)}-${pad(seeded.start.getDate())}`;
+    const seededTime = `${pad(seeded.start.getHours())}:${pad(seeded.start.getMinutes())}`;
 
     const result = await updateMeetingScheduleAction(
       SCHEDULE_INITIAL,
-      // 시드 reservation-2: room-large, 2026-08-03 10:00–10:30
       scheduleForm({
         meetingId: meeting.id,
-        roomId: "room-large",
-        date: "2026-08-03",
-        startTime: "10:00",
+        roomId: seeded.roomId,
+        date: seededDate,
+        startTime: seededTime,
       }),
     );
 
