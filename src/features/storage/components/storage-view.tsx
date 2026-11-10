@@ -38,8 +38,9 @@ interface StorageViewProps {
  *    아래 목 상태 때문이지 데이터를 가져오려는 게 아니다(§서버우선).
  * ⚠️ **삭제는 창으로 확인받는다.** 되돌릴 수 없는 일이라 토스트로 알리고 지나갈 수 없다
  *    (CLAUDE.md §렌더링: 파괴적 작업 확인은 Dialog).
- * ⚠️ 지운 결과는 지금 **화면 안에서만** 반영된다. 목이라서다 — 연동되면 이 `useState`를
- *    지우고 `revalidatePath`가 새 값을 내려 준다.
+ * ⚠️ 지운 줄은 **화면 상태에서 바로 뺀다.** 실서버는 액션이 `revalidatePath`로 새 값을
+ *    다시 내려 주지만, `useState`는 첫 값만 받으므로 여기서도 빼야 표와 합계가 즉시 맞는다.
+ *    목은 실제로 지우지 않아 이 상태가 유일한 결과다(다시 열면 돌아온다).
  */
 export function StorageView({ overview, config, canManage, today }: StorageViewProps) {
   const [projects, setProjects] = useState<readonly ProjectStorage[]>(overview.projects);
