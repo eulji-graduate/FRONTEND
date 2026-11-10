@@ -14,7 +14,16 @@ export function buildTimelineInput(actions: TeamHandoverAction[]): TimelineActio
       title: action.title,
       tagBgColor: color.bgColor,
       tagTextColor: color.textColor,
-      startDate: action.startDate,
+      /*
+        ⚠️ 시작일을 모르는 액션이 있다(#23) — BE는 "아직 시작 안 함"을 NULL로 두고 매퍼
+           (`toTeamHandoverAction`)는 지어내지 않고 빈 문자열로 넘긴다. 그대로 타임라인에 넣으면
+           `parseLocalDate("")`가 Invalid Date가 되어 축 범위(`Math.min`)·머리 라벨·막대 위치가
+           전부 NaN이 된다.
+        ⚠️ 여기서는 **마감일 하루짜리 막대**로 그린다 — 시작일을 지어내지 않는다(§정직성).
+           "시작일 없으면 내일"(`fallbackActionStartDate`)은 할 일 칸 배치용이라 쓰지 않는다:
+           마감이 지난 미시작 액션에서 시작일이 마감일보다 뒤가 되어 막대 폭이 음수가 된다.
+      */
+      startDate: action.startDate || action.dueDate,
       dueDate: action.dueDate,
       tone: isDelayed(action) ? "DELAYED" : action.status,
     };
