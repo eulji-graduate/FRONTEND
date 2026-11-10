@@ -3,6 +3,7 @@ import "server-only";
 import { PROJECT_STATUS, type ProjectStatus } from "@/constants/project";
 import { requireAccessToken } from "@/features/auth/session";
 import { serverApi } from "@/lib/api";
+import { addDaysIso, todayIso } from "@/lib/date";
 import { ep } from "@/lib/endpoints";
 import { isMock } from "@/mocks/config";
 
@@ -25,58 +26,63 @@ import type { ProjectStorage, StorageOverview } from "./types";
  * ⚠️ 음성이 자막·요약보다 훨씬 크다. 실제로도 그렇고(오디오 대 텍스트), 그래야
  *    "지울 건 음성"이라는 이 화면의 말이 숫자로도 맞다.
  * ⚠️ 끝난 프로젝트를 **둘** 뒀다 — 지울 수 있는 줄이 하나도 없으면 그 경로를 못 본다.
+ * ⚠️ **최근 기록일은 `today`에서 계산한다.** 날짜를 박아 두면 시연일이 지난 뒤 "4개월 전"이
+ *    "9개월 전"으로 변한다. 진행 중 프로젝트는 최근 며칠 안, 끝난 프로젝트는 몇 달 전이라는
+ *    **관계**를 지키는 게 목적이다.
  */
-const MOCK: StorageOverview = {
-  voiceGb: 34.9,
-  sttGb: 6.8,
-  projects: [
-    {
-      tag: "product-v2",
-      name: "제품 v2.0",
-      meetingCount: 24,
-      voiceGb: 9.1,
-      sttGb: 1.4,
-      lastRecordedAt: "2026-08-03",
-      status: PROJECT_STATUS.IN_PROGRESS,
-    },
-    {
-      tag: "infra-migration",
-      name: "인프라 마이그레이션",
-      meetingCount: 31,
-      voiceGb: 10.9,
-      sttGb: 1.7,
-      lastRecordedAt: "2026-07-29",
-      status: PROJECT_STATUS.IN_PROGRESS,
-    },
-    {
-      tag: "marketing-q3",
-      name: "마케팅 캠페인 Q3",
-      meetingCount: 18,
-      voiceGb: 6.8,
-      sttGb: 1.1,
-      lastRecordedAt: "2026-08-01",
-      status: PROJECT_STATUS.IN_PROGRESS,
-    },
-    {
-      tag: "hr-process",
-      name: "HR 프로세스 재정비",
-      meetingCount: 12,
-      voiceGb: 4.5,
-      sttGb: 1.3,
-      lastRecordedAt: "2026-03-27",
-      status: PROJECT_STATUS.DONE,
-    },
-    {
-      tag: "ops-automation",
-      name: "운영 자동화",
-      meetingCount: 9,
-      voiceGb: 3.6,
-      sttGb: 1.3,
-      lastRecordedAt: "2025-11-14",
-      status: PROJECT_STATUS.DONE,
-    },
-  ],
-};
+function buildMock(today: string): StorageOverview {
+  return {
+    voiceGb: 34.9,
+    sttGb: 6.8,
+    projects: [
+      {
+        tag: "product-v2",
+        name: "제품 v2.0",
+        meetingCount: 24,
+        voiceGb: 9.1,
+        sttGb: 1.4,
+        lastRecordedAt: addDaysIso(today, -3),
+        status: PROJECT_STATUS.IN_PROGRESS,
+      },
+      {
+        tag: "infra-migration",
+        name: "인프라 마이그레이션",
+        meetingCount: 31,
+        voiceGb: 10.9,
+        sttGb: 1.7,
+        lastRecordedAt: addDaysIso(today, -8),
+        status: PROJECT_STATUS.IN_PROGRESS,
+      },
+      {
+        tag: "marketing-q3",
+        name: "마케팅 캠페인 Q3",
+        meetingCount: 18,
+        voiceGb: 6.8,
+        sttGb: 1.1,
+        lastRecordedAt: addDaysIso(today, -5),
+        status: PROJECT_STATUS.IN_PROGRESS,
+      },
+      {
+        tag: "hr-process",
+        name: "HR 프로세스 재정비",
+        meetingCount: 12,
+        voiceGb: 4.5,
+        sttGb: 1.3,
+        lastRecordedAt: addDaysIso(today, -130),
+        status: PROJECT_STATUS.DONE,
+      },
+      {
+        tag: "ops-automation",
+        name: "운영 자동화",
+        meetingCount: 9,
+        voiceGb: 3.6,
+        sttGb: 1.3,
+        lastRecordedAt: addDaysIso(today, -260),
+        status: PROJECT_STATUS.DONE,
+      },
+    ],
+  };
+}
 
 /**
  * BE shape → UI 계약 (§Mock 격리막).
@@ -146,7 +152,7 @@ function toStorageOverview(be: BeStorageOverview): StorageOverview {
  *    가드(`canManageStorage`)가 이미 걸러 이 함수를 부르기 전에 막는다.
  */
 export async function getStorageOverview(): Promise<StorageOverview> {
-  if (isMock) return MOCK;
+  if (isMock) return buildMock(todayIso());
 
   const accessToken = await requireAccessToken();
   const overview = await serverApi<BeStorageOverview>(ep.companyStorage(), { accessToken });

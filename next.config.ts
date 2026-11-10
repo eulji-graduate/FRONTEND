@@ -11,8 +11,6 @@ import type { NextConfig } from "next";
 process.env.TZ = "Asia/Seoul";
 
 const nextConfig: NextConfig = {
-  // Docker 이미지에 node_modules 전체 대신 추적된 최소 런타임만 담기 위함(.next/standalone).
-  output: "standalone",
   /*
     개발 서버 표시등(왼쪽 아래 동그란 `N` 배지)을 끈다.
 
@@ -23,10 +21,8 @@ const nextConfig: NextConfig = {
        빌드 실패를 조용히 넘기지 않는다(§정직성).
   */
   devIndicators: false,
-  // 프록시(nginx) 뒤에서 도메인으로 접속하면 Server Action이 Origin 불일치로 막힌다.
   experimental: {
     serverActions: {
-      allowedOrigins: ["www.z-groupware.site", "z-groupware.site"],
       bodySizeLimit: "100mb",
     },
   },

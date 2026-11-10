@@ -1,6 +1,6 @@
 import type { Authority } from "@/constants/authority";
 import type { ActionStatus } from "@/constants/domain";
-import type { HandoverType } from "@/constants/handover";
+import type { FinalizeBlockReason, HandoverType } from "@/constants/handover";
 import type { MemberStatus } from "@/constants/member";
 
 /**
@@ -50,7 +50,9 @@ export interface ManagedMember {
    * ⚠️ **행에 실어 둔다.** 상태만 보면 휴직 대기와 오프보딩 대기가 둘 다 `WAITING`이라
    *    구분이 안 된다 — 예전에는 이걸 알려고 목록이 상세를 사람 수만큼 훑었다(N+1).
    *    하나만 실패해도 목록 전체가 오류 화면이 됐다.
-   * ⚠️ 컬럼으로 **보여주지는 않는다**(WORKFLOW §9의 컬럼 목록에 없다). 거르는 데만 쓴다.
+   * ⚠️ **열을 따로 만들지는 않는다**(WORKFLOW §9의 컬럼 목록에 없다). 대신 `상태` 배지가 이
+   *    값으로 "휴직 대기"·"오프보딩 대기"를 가르고(`memberStatusLabel`, 디자인 시안 ②),
+   *    필터(`manage-filter`)가 이 값으로 거른다.
    */
   pendingHandoverType: HandoverType | null;
 }
@@ -96,13 +98,18 @@ export interface PendingHandover {
   /** 넘긴 액션 수 */
   actionCount: number;
   midApproval: { approverName: string; approvedAt: string } | null;
-  /**
-   * **신청 당시** 그 사람이 팀장이었는지 — 지금(`member.authority`)이 아니라 그때 값을
-   * 그대로 굳혀 둔다(CodeRabbit 지적, 2026-08-09). 팀장 공석 중엔 일반 팀원도 승급될 수
-   * 있는데, 승인 카드가 그때그때의 권한을 다시 읽으면 승급 전 일반 팀원 신청이 승급 후엔
-   * "팀장 본인 신청"으로 잘못 표시된다.
-   */
-  requesterAuthority: Authority;
+  /*
+    ⚠️ 아래 셋은 **BE가 조회자 기준으로 판정해 준다**([확인] BE `HandoverSummaryResponse`,
+       `momo/handover-approval`). 화면은 권한·중간 승인으로 다시 추정하지 않는다.
+    ⚠️ 신청 당시 권한 스냅샷은 없다 — BE는 **지금** 그 팀 팀장인지로 판정한다. 그래서 이
+       값들을 "그때 팀장이었다"는 근거로 쓰지 않는다.
+  */
+  /** 지금 조회자가 최종 승인할 수 있는지 — **최종 승인 버튼만** 이 값으로 잠근다(반려는 아니다) */
+  canFinalize: boolean;
+  /** 팀장 중간 승인을 더 받아야 하는지 */
+  requiresIntermediateApproval: boolean;
+  /** 최종 승인을 못 하는 이유. 할 수 있으면 `null` */
+  finalizeBlockReason: FinalizeBlockReason | null;
 }
 
 /** 상세 한 사람 */

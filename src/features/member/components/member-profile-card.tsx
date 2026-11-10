@@ -2,12 +2,20 @@ import { ShieldCheck } from "lucide-react";
 
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AUTHORITY_BADGE_CLASS, AUTHORITY_LABEL } from "@/constants/authority";
-import { MEMBER_STATUS_BADGE_CLASS, MEMBER_STATUS_LABEL } from "@/constants/member";
+import type { HandoverType } from "@/constants/handover";
+import { MEMBER_STATUS_BADGE_CLASS } from "@/constants/member";
 import { formatYearMonthDay } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 import { GRADE_LOCK_NOTE, gradeLockOf } from "../grade";
 import type { ManagedMember } from "../manage-types";
+import { memberStatusLabel } from "../status-label";
+
+interface MemberProfileCardProps {
+  member: ManagedMember;
+  /** 승인을 기다리는 신청의 종류 — 상태 배지를 "휴직 대기"·"오프보딩 대기"로 가른다 */
+  pendingHandoverType: HandoverType | null;
+}
 
 /**
  * 왼쪽 위 — 이 사람이 누구인가.
@@ -24,7 +32,7 @@ import type { ManagedMember } from "../manage-types";
  * ⚠️ 팀이 없는 사람(Owner)은 `-`를 안 적는다. 이 줄은 표가 아니라 문장이라 빈칸 표시가
  *    오히려 어색하다 — 목록 표에서만 `-`로 채운다.
  */
-export function MemberProfileCard({ member }: { member: ManagedMember }) {
+export function MemberProfileCard({ member, pendingHandoverType }: MemberProfileCardProps) {
   const lock = gradeLockOf(member);
   const rows = [
     { label: "이메일", value: member.email },
@@ -78,7 +86,7 @@ export function MemberProfileCard({ member }: { member: ManagedMember }) {
               MEMBER_STATUS_BADGE_CLASS[member.status],
             )}
           >
-            {MEMBER_STATUS_LABEL[member.status]}
+            {memberStatusLabel(member.status, pendingHandoverType)}
           </span>
         </div>
 

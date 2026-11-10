@@ -5,11 +5,12 @@ import Link from "next/link";
 import { EmptyState } from "@/components/common/empty-state";
 import { ProfileAvatar } from "@/components/common/profile-avatar";
 import { AUTHORITY_BADGE_CLASS, AUTHORITY_LABEL } from "@/constants/authority";
-import { MEMBER_STATUS_BADGE_CLASS, MEMBER_STATUS_LABEL } from "@/constants/member";
+import { MEMBER_STATUS_BADGE_CLASS } from "@/constants/member";
 import { formatYearMonthDay } from "@/lib/date";
 import { cn } from "@/lib/utils";
 
 import type { ManagedMember } from "../manage-types";
+import { memberStatusLabel } from "../status-label";
 
 /**
  * 사원 목록 표.
@@ -80,15 +81,19 @@ function AuthorityCell({ member }: { member: ManagedMember }) {
  * ⚠️ 전에는 넷이 사실상 같은 알약이라 `재직`과 `대기`가 글자 말고는 구분이 안 됐다.
  *    색이 아니라 **채움과 진하기**로 가른다(§디자인 토큰: 색으로 알리는 건 에러뿐).
  */
-function StatusCell({ status }: { status: ManagedMember["status"] }) {
+function StatusCell({
+  status,
+  pendingHandoverType,
+}: Pick<ManagedMember, "status" | "pendingHandoverType">) {
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-[11px] leading-4",
+        // ⚠️ `whitespace-nowrap` — 표가 최소 폭(880)까지 줄면 `오프보딩 대기`가 두 줄로 접혀 행 높이가 튄다
+        "inline-flex shrink-0 items-center rounded border px-2 py-0.5 text-[11px] leading-4 whitespace-nowrap",
         MEMBER_STATUS_BADGE_CLASS[status],
       )}
     >
-      {MEMBER_STATUS_LABEL[status]}
+      {memberStatusLabel(status, pendingHandoverType)}
     </span>
   );
 }
@@ -138,14 +143,16 @@ export function MemberTable({
              비율이면 화면이 넓어질 때 일곱 열이 **같이** 늘어난다.
           ⚠️ `입사일`은 `2020년 1월 2일`이 한 줄에 들어가는 몫을 준다. 좁게 뒀더니
              `2020년 1월 2` / `일`로 잘려 줄마다 높이가 달라졌다.
+          ⚠️ `상태`는 `오프보딩 대기`가 한 줄에 들어가게 12%다(#14). 그 2%는 대부분 `없음`인
+             `역할`에서 가져왔다(16→14).
         */}
         <colgroup>
           <col className="w-[22%]" />
           <col className="w-[12%]" />
           <col className="w-[10%]" />
           <col className="w-[16%]" />
-          <col className="w-[16%]" />
-          <col className="w-[10%]" />
+          <col className="w-[14%]" />
+          <col className="w-[12%]" />
           <col className="w-[14%]" />
         </colgroup>
         <thead>
@@ -177,7 +184,7 @@ export function MemberTable({
           {members.map((member) => (
             <tr
               key={member.id}
-              className="border-border hover:bg-secondary/50 border-b transition-colors last:border-b-0"
+              className="border-border hover:bg-foreground/[0.04] border-b transition-colors last:border-b-0"
             >
               <th scope="row" className="px-7 py-3.5 text-left font-normal">
                 <Link
@@ -202,7 +209,10 @@ export function MemberTable({
               </td>
               {/* ⚠️ 배지만 든 칸에도 본문 크기를 준다 — 안 주면 셀이 기본 16px을 물려받아 줄 높이가 달라진다 */}
               <td className="px-4 py-3.5 text-center text-[13px] leading-5">
-                <StatusCell status={member.status} />
+                <StatusCell
+                  status={member.status}
+                  pendingHandoverType={member.pendingHandoverType}
+                />
               </td>
               {/*
                 ⚠️ **요일을 빼고 적는다.** 입사일이 무슨 요일이었는지는 쓸 데가 없는데,

@@ -19,7 +19,9 @@ import { type AccountDraft, MEMBER_FILTER } from "./manage-types";
 import {
   completeMockHandoverMidApproval,
   findMockManagedMember,
+  listMockHandoverActions,
   listMockManagedMembers,
+  reassignMockHandoverAction,
   resetMockManagedMembers,
 } from "./mock/managed";
 
@@ -241,8 +243,24 @@ describe("승인 · 반려", () => {
   */
   it("중간 승인 전에는 최종 승인을 막는다", async () => {
     const result = await approveHandoverAction(WAITING_ID);
-    expect(result.isSuccess).toBe(false);
+    expect(result).toEqual({
+      isSuccess: false,
+      message: "팀장의 중간 승인 후 최종 승인할 수 있습니다.",
+    });
     expect(findMockManagedMember(WAITING_ID)?.pendingHandover).not.toBeNull();
+  });
+
+  /* 목도 BE처럼 조회자 기준으로 판정한다 — 조회자를 모르면 대표가 아닌 것으로 본다 */
+  it("목 조회는 조회자가 대표일 때만 canFinalize가 참이다", () => {
+    completeMockHandoverMidApproval(WAITING_ID, "김서준", "2026-08-08");
+
+    expect(
+      findMockManagedMember(WAITING_ID, { isViewerOwner: true })?.pendingHandover,
+    ).toMatchObject({ canFinalize: true, finalizeBlockReason: null });
+    expect(findMockManagedMember(WAITING_ID)?.pendingHandover).toMatchObject({
+      canFinalize: false,
+      finalizeBlockReason: "OWNER_REQUIRED",
+    });
   });
 
   it("휴직을 승인하면 휴직 상태가 되고 신청이 사라진다", async () => {
@@ -302,6 +320,68 @@ describe("승인 · 반려", () => {
     const after = findMockManagedMember(WAITING_ID);
     expect(after?.member.status).toBe(MEMBER_STATUS.ACTIVE);
     expect(after?.pendingHandover).toBeNull();
+  });
+
+  /*
+    ⚠️ **중간 승인으로 넘어간 액션은 반려하면 원래 담당자에게 돌아온다**(BE
+       `rollbackCommittedReassignments`와 같은 결과). 임지안(8)의 `캠페인 소재 정리`(a-105)는
+       중간 승인 때 정민석(6)에게 넘어가 있다.
+  */
+  it("오프보딩을 반려하면 넘긴 액션이 원래 담당자에게 돌아온다", async () => {
+    expect(findMockManagedMember(8)?.actions?.items.map((action) => action.id)).toEqual([]);
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).toContain("a-105");
+
+    expect(await rejectHandoverAction(8, "인계 대상이 잘못됐습니다")).toEqual({ isSuccess: true });
+
+    expect(findMockManagedMember(8)?.actions?.items.map((action) => action.id)).toEqual(["a-105"]);
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).not.toContain(
+      "a-105",
+    );
+    expect(findMockManagedMember(8)?.member.status).toBe(MEMBER_STATUS.ACTIVE);
+  });
+
+  it("오프보딩을 승인하면 넘긴 액션은 받은 사람에게 그대로 남는다", async () => {
+    await approveHandoverAction(8);
+
+    expect(findMockManagedMember(6)?.actions?.items.map((action) => action.id)).toContain("a-105");
+  });
+
+  /* #27 — `/team/handover` 상세가 이 목에서 인계 액션을 읽는다(BE 시드 101·102·106) */
+  it("이하윤의 인계 대상은 미완료 3건이다(a-101·a-102·a-106)", () => {
+    expect(listMockHandoverActions(WAITING_ID).map((action) => action.id)).toEqual([
+      "a-101",
+      "a-102",
+      "a-106",
+    ]);
+  });
+
+  it("팀장이 재배정하면 액션이 옮겨지고, 반려하면 원래 담당자에게 돌아온다", async () => {
+    reassignMockHandoverAction(WAITING_ID, "a-102", 4);
+    completeMockHandoverMidApproval(WAITING_ID, "김서준", "2026-11-09");
+
+    expect(
+      findMockManagedMember(WAITING_ID)?.actions?.items.map((action) => action.id),
+    ).not.toContain("a-102");
+    expect(findMockManagedMember(4)?.actions?.items.map((action) => action.id)).toContain("a-102");
+
+    expect(await rejectHandoverAction(WAITING_ID, "다시 확인해 주세요")).toEqual({
+      isSuccess: true,
+    });
+
+    expect(findMockManagedMember(WAITING_ID)?.actions?.items.map((action) => action.id)).toContain(
+      "a-102",
+    );
+    expect(findMockManagedMember(4)?.actions?.items.map((action) => action.id)).not.toContain(
+      "a-102",
+    );
+  });
+
+  /* ⚠️ 이하윤 건수는 BE 시드(인수인계 301)와 같다 — 담당 4건 중 완료 1건은 인계에서 빠진다 */
+  it("이하윤은 담당 액션 4건, 인계 액션 3건이다", () => {
+    const hayun = findMockManagedMember(WAITING_ID);
+
+    expect(hayun?.actions?.totalCount).toBe(4);
+    expect(hayun?.pendingHandover?.actionCount).toBe(3);
   });
 
   /* ⚠️ 사유 없이 되돌리면 신청한 사람은 무엇을 고쳐 다시 낼지 알 수 없다 */

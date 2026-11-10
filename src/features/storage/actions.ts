@@ -1,6 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
+
+import { requireAccessToken } from "@/features/auth/session";
 import { getViewer } from "@/features/shell/viewer";
+import { ApiError, serverApi, toUserMessage } from "@/lib/api";
+import { ep } from "@/lib/endpoints";
 import { canManageStorage } from "@/lib/permission";
 import { isMock } from "@/mocks/config";
 
@@ -14,8 +19,8 @@ import { canDeleteRecordings } from "./storage";
  * ⚠️ **되돌릴 수 없는 일이다.** 지운 음성은 복구되지 않는다 — 그래서 권한도, 지울 수 있는
  *    줄인지도 **서버에서 다시 본다**. 화면에서 버튼을 감춘 건 UX일 뿐이고, 액션은 주소만
  *    알면 직접 부를 수 있다(§권한: 화면 숨김은 보안이 아니다).
- * ⚠️ **조회(`getStorageOverview`)는 실연동됐다**(2026-08-14 BE PR #494). 삭제만 아직
- *    목이다 — BE에 `DELETE .../projects/{tag}`가 없다(아래 `deleteRecordingsAction` 참고).
+ * ⚠️ 조회(`getStorageOverview`, 2026-08-14 BE PR #494)와 삭제(`DELETE .../projects/{tag}`,
+ *    #26) 둘 다 실연동됐다.
  */
 
 /** 액션의 공통 결과 — 실패를 예외로 던지지 않고 값으로 돌려준다(화면이 문구를 고른다) */
@@ -24,6 +29,14 @@ export interface StorageActionResult {
   /** 실패 사유 한 줄. 성공이면 없다 */
   message?: string;
 }
+
+/**
+ * BE 거절 코드 → 문장. [확인] BE `MeteringErrorCode`(develop).
+ * ⚠️ `MT-010`은 BE 문구가 영어라 우리 문장으로 바꾼다. 나머지는 BE 한글 문구를 그대로 쓴다.
+ */
+const BE_ERROR_MESSAGE: Record<string, string> = {
+  "MT-010": "끝난 프로젝트만 삭제할 수 있습니다",
+};
 
 const FORBIDDEN: StorageActionResult = {
   isSuccess: false,
@@ -84,18 +97,28 @@ export async function deleteRecordingsAction(tag: string): Promise<StorageAction
       ⚠️ **목에서는 `revalidatePath`를 부르지 않는다.** 목은 실제로 아무것도 안 지우므로,
          다시 읽어 오면 방금 지운 줄이 그대로 돌아와 **화면이 되돌아간다** — 눌러도 아무
          일도 안 일어난 것처럼 보인다. 지운 결과는 화면의 상태가 들고 있다.
-      ⚠️ 연동되면 여기서 `revalidatePath("/manage/storage")`를 부르고, 화면 쪽 `useState`를
-         지운다(`storage-view.tsx`) — 그때는 서버가 준 값이 정본이다.
+      ⚠️ 실서버 분기만 아래에서 `revalidatePath("/manage/storage")`를 부른다.
     */
     return { isSuccess: true };
   }
 
   /*
-    ⚠️ **BE에 아직 이 경로가 없다**(2026-08-14 확인 — `CompanyStorageController`는
-       조회(`GET /companies/me/storage`)만 있고 삭제 라우트가 없다). 조회는 이미 실연동
-       됐으니 되는 척하지 않는다(§정직성) — 없는 API를 부르는 대신 여기서 명시적으로 막는다.
-       BE가 `DELETE /companies/me/storage/projects/{tag}`를 열면 그 자리에 `serverApi`
-       호출과 `revalidatePath("/manage/storage")`를 넣는다.
+    [확인] BE `CompanyStorageController.deleteProjectStorage`(develop, #26) —
+    `DELETE /api/companies/me/storage/projects/{tag}`. Owner·Admin만, 끝난(DONE) 프로젝트만.
+    ⚠️ **처리 중이면 409로 거절된다**(`MT-011` — 녹음·분석이 도는 중). 그 문장은 BE 한글
+       문구를 그대로 보여 준다 — 사용자가 "잠시 뒤 다시"를 알아야 한다.
+    ⚠️ 지워도 **구독 화면의 사용량 수치는 그대로다**(BE 동작, 민섭님 확인 2026-11-09) —
+       그래서 `/manage/billing`은 다시 읽지 않는다.
   */
-  return { isSuccess: false, message: "삭제하지 못했습니다 — 아직 지원하지 않는 기능입니다" };
+  try {
+    const accessToken = await requireAccessToken();
+    await serverApi<unknown>(ep.companyStorageProject(tag), { method: "DELETE", accessToken });
+  } catch (error) {
+    const known =
+      error instanceof ApiError && error.code ? BE_ERROR_MESSAGE[error.code] : undefined;
+    return { isSuccess: false, message: known ?? toUserMessage(error) };
+  }
+
+  revalidatePath("/manage/storage");
+  return { isSuccess: true };
 }

@@ -2,7 +2,9 @@ import { AUTHORITY } from "@/constants/authority";
 import { ACTION_STATUS } from "@/constants/domain";
 import { HANDOVER_TYPE } from "@/constants/handover";
 import { DELETED_MEMBER_STATUS, isVisibleMemberStatus, MEMBER_STATUS } from "@/constants/member";
+import { addDaysIso, todayIso } from "@/lib/date";
 
+import { evaluateFinalApproval } from "../final-approval";
 import type {
   ManagedMember,
   ManagedMemberAction,
@@ -18,10 +20,26 @@ import type {
  *    반복될 뿐이라, **읽는 자리(`findMockManagedMember`)에서 한 번에 씌운다** — 목은
  *    "이 사람이 무슨 액션을 들고 있나"만 적는다.
  */
+/**
+ * 목이 들고 있는 신청 — 최종 승인 판정 셋은 **빼고** 둔다.
+ * ⚠️ 그 셋은 조회자마다 다르다(BE도 조회자 기준으로 계산한다). 저장해 두면 대표가 보든
+ *    겸직 관리자가 보든 같은 값이 나가므로, 읽는 자리(`findMockManagedMember`)에서 계산한다.
+ */
+type MockPendingHandover = Omit<
+  PendingHandover,
+  "canFinalize" | "requiresIntermediateApproval" | "finalizeBlockReason"
+>;
+
 interface MockManagedMemberEntry {
   member: ManagedMember;
   actions: ManagedMemberAction[];
-  pendingHandover: PendingHandover | null;
+  pendingHandover: MockPendingHandover | null;
+  /**
+   * 중간 승인으로 **이미 남에게 넘어간** 액션 — 반려하면 이걸 보고 원래 담당자에게 되돌린다.
+   * ⚠️ 목에만 있는 기록이다. 화면 계약(`PendingHandover`)에 넣지 않는다 — BE는 이 이력을
+   *    서버 안에서 들고 반려 때 스스로 되돌린다(`HandoverService.rollbackCommittedReassignments`).
+   */
+  handedOver?: { actionId: string; toMemberId: number }[];
 }
 
 /**
@@ -33,246 +51,271 @@ interface MockManagedMemberEntry {
  *    반영된다 — 눌러도 아무 일 없는 목은 "승인했습니다"가 거짓말이 된다(§정직한 목업).
  */
 
-const INITIAL: MockManagedMemberEntry[] = [
-  {
-    // ⚠️ Owner는 팀이 없다 — 화면에 `-`로 적힌다(WORKFLOW §9)
-    member: {
-      id: 1,
-      name: "박대표",
-      email: "ceo@zgroup.co.kr",
-      teamName: null,
-      position: "대표",
-      authority: AUTHORITY.OWNER,
-      isAdmin: false,
-      roleLabel: null,
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2020-01-02",
-      pendingHandoverType: null,
-    },
-    actions: [],
-    pendingHandover: null,
-  },
-  {
-    member: {
-      id: 2,
-      name: "김서준",
-      email: "seojun@zgroup.co.kr",
-      teamName: "개발팀",
-      position: "팀장",
-      authority: AUTHORITY.LEADER,
-      isAdmin: false,
-      roleLabel: null,
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2021-03-02",
-      pendingHandoverType: null,
-    },
-    actions: [
-      {
-        id: "a-201",
-        title: "3분기 개발 로드맵 확정",
-        status: ACTION_STATUS.IN_PROGRESS,
-        dueDate: "2026-08-14",
+/*
+  ⚠️ **마감일·휴직 기간·중간 승인일은 `today`에서 계산한다.** 8월로 박아 두면 시연일이 지난 뒤
+     "지연" 표기와 휴직 기간이 과거 것으로 굳는다. 입사일(`joinedAt`)은 과거 기록이라 그대로 둔다.
+  ⚠️ 상태(저장값)와 마감일의 **관계**를 지킨다 — 진행 중인데 마감이 지난 건 `지연`으로 계산돼
+     보이고(a-101), 할 일·진행 중은 아직 안 지난 마감을 갖고, 완료는 이미 지난 마감을 갖는다.
+  ⚠️ 이 저장소는 모듈 로드 때 한 번 만든다 — 서버를 며칠 켜 두면 그 시작일 기준으로 굳는다.
+*/
+function buildInitial(today: string): MockManagedMemberEntry[] {
+  return [
+    {
+      // ⚠️ Owner는 팀이 없다 — 화면에 `-`로 적힌다(WORKFLOW §9)
+      member: {
+        id: 1,
+        name: "박대표",
+        email: "ceo@zgroup.co.kr",
+        teamName: null,
+        position: "대표",
+        authority: AUTHORITY.OWNER,
+        isAdmin: false,
+        roleLabel: null,
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2020-01-02",
+        pendingHandoverType: null,
       },
-    ],
-    pendingHandover: null,
-  },
-  {
-    /*
+      actions: [],
+      pendingHandover: null,
+    },
+    {
+      member: {
+        id: 2,
+        name: "김서준",
+        email: "seojun@zgroup.co.kr",
+        teamName: "개발팀",
+        position: "팀장",
+        authority: AUTHORITY.LEADER,
+        isAdmin: false,
+        roleLabel: null,
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2021-03-02",
+        pendingHandoverType: null,
+      },
+      actions: [
+        {
+          id: "a-201",
+          title: "4분기 개발 로드맵 확정",
+          status: ACTION_STATUS.IN_PROGRESS,
+          dueDate: addDaysIso(today, 8),
+        },
+      ],
+      pendingHandover: null,
+    },
+    {
+      /*
       ⚠️ **휴직 승인을 기다리는 사람을 하나 둔다.** 없으면 이 화면의 핵심 경로
          (최종 승인·반려)를 데모에서 아예 못 본다.
     */
-    member: {
-      id: 3,
-      name: "이하윤",
-      email: "hayun@zgroup.co.kr",
-      teamName: "개발팀",
-      position: "선임",
-      authority: AUTHORITY.MEMBER,
-      isAdmin: true,
-      roleLabel: "프론트엔드",
-      status: MEMBER_STATUS.WAITING,
-      joinedAt: "2022-05-10",
-      pendingHandoverType: null,
-    },
-    actions: [
-      {
-        id: "a-101",
-        title: "온보딩 플로우 와이어프레임 검토",
-        status: ACTION_STATUS.IN_PROGRESS,
-        dueDate: "2026-08-05",
+      member: {
+        id: 3,
+        name: "이하윤",
+        email: "hayun@zgroup.co.kr",
+        teamName: "개발팀",
+        position: "선임",
+        authority: AUTHORITY.MEMBER,
+        isAdmin: true,
+        roleLabel: "프론트엔드",
+        status: MEMBER_STATUS.WAITING,
+        joinedAt: "2022-05-10",
+        pendingHandoverType: null,
       },
-      {
-        id: "a-102",
-        title: "API 엔드포인트 문서화",
-        status: ACTION_STATUS.TODO,
-        dueDate: "2026-08-07",
-      },
-      {
-        id: "a-103",
-        title: "스프린트 보드 세팅",
-        status: ACTION_STATUS.DONE,
-        dueDate: "2026-07-25",
-      },
-    ],
-    pendingHandover: {
-      id: "h-301",
-      type: HANDOVER_TYPE.VACATION,
-      period: { from: "2026-08-05", to: "2026-08-09" },
-      actionCount: 3,
-      /*
+      actions: [
+        {
+          id: "a-101",
+          title: "온보딩 플로우 와이어프레임 검토",
+          status: ACTION_STATUS.IN_PROGRESS,
+          dueDate: addDaysIso(today, -1),
+        },
+        {
+          id: "a-102",
+          title: "API 엔드포인트 문서화",
+          status: ACTION_STATUS.TODO,
+          dueDate: addDaysIso(today, 2),
+        },
+        {
+          id: "a-103",
+          title: "스프린트 보드 세팅",
+          status: ACTION_STATUS.DONE,
+          dueDate: addDaysIso(today, -10),
+        },
+        {
+          id: "a-106",
+          title: "온보딩 QA 체크리스트 작성",
+          status: ACTION_STATUS.TODO,
+          dueDate: addDaysIso(today, 4),
+        },
+      ],
+      pendingHandover: {
+        id: "h-301",
+        type: HANDOVER_TYPE.VACATION,
+        period: { from: addDaysIso(today, 3), to: addDaysIso(today, 7) },
+        /*
+        ⚠️ **인계 항목은 3건이다 — 위 담당 액션(4건)과 일부러 다른 숫자다.** 완료한 액션(a-103)은
+           넘길 일이 없어 인수인계서에 안 담긴다. BE 시드(`db/local/data.sql` 인수인계 301)도
+           미완료 액션 101·102·106 셋만 담는다(#10, #16 재대조).
+      */
+        actionCount: 3,
+        /*
         ⚠️ 아직 팀장 중간 승인 전이다(`null`) — `/team/handover`에서 김서준이 이 신청을
            처리해야 하는 데모 대상이다. 이미 중간 승인된 신청 데모는 임지안(id 8)이 맡는다.
       */
-      midApproval: null,
+        midApproval: null,
+      },
+    },
+    {
+      member: {
+        id: 4,
+        name: "박도현",
+        email: "dohyun@zgroup.co.kr",
+        teamName: "개발팀",
+        position: "주임",
+        authority: AUTHORITY.MEMBER,
+        isAdmin: false,
+        roleLabel: "백엔드",
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2023-01-15",
+        pendingHandoverType: null,
+      },
+      actions: [
+        {
+          id: "a-104",
+          title: "회의록 저장 API 연동",
+          status: ACTION_STATUS.TODO,
+          dueDate: addDaysIso(today, 6),
+        },
+      ],
+      pendingHandover: null,
+    },
+    {
+      member: {
+        id: 5,
+        name: "최유진",
+        email: "yujin@zgroup.co.kr",
+        teamName: "마케팅팀",
+        position: "팀장",
+        authority: AUTHORITY.LEADER,
+        isAdmin: false,
+        roleLabel: null,
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2023-04-20",
+        pendingHandoverType: null,
+      },
+      actions: [],
+      pendingHandover: null,
+    },
+    {
+      member: {
+        id: 6,
+        name: "정민석",
+        email: "minseok@zgroup.co.kr",
+        teamName: "마케팅팀",
+        position: "대리",
+        authority: AUTHORITY.MEMBER,
+        isAdmin: false,
+        roleLabel: "브랜드",
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2020-09-01",
+        pendingHandoverType: null,
+      },
       /*
-        ⚠️ **신청 당시** 값을 굳혀 둔다(CodeRabbit 지적, 2026-08-09) — 나중에 이 사람의
-           `authority`가 바뀌어도(팀장 승급 등) 이 신청은 그때 기준을 그대로 유지한다.
+        ⚠️ 임지안(id 8)의 오프보딩 인계에서 넘겨받은 액션이다 — BE 시드가 액션 105를 6번으로
+           옮긴다(#10).
       */
-      requesterAuthority: AUTHORITY.MEMBER,
+      actions: [
+        {
+          id: "a-105",
+          title: "캠페인 소재 정리",
+          status: ACTION_STATUS.IN_PROGRESS,
+          dueDate: addDaysIso(today, 14),
+        },
+      ],
+      pendingHandover: null,
     },
-  },
-  {
-    member: {
-      id: 4,
-      name: "박도현",
-      email: "dohyun@zgroup.co.kr",
-      teamName: "개발팀",
-      position: "주임",
-      authority: AUTHORITY.MEMBER,
-      isAdmin: false,
-      roleLabel: "백엔드",
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2023-01-15",
-      pendingHandoverType: null,
-    },
-    actions: [
-      {
-        id: "a-104",
-        title: "회의록 저장 API 연동",
-        status: ACTION_STATUS.TODO,
-        dueDate: "2026-08-12",
+    {
+      member: {
+        id: 7,
+        name: "강서연",
+        email: "seoyeon@zgroup.co.kr",
+        teamName: "디자인팀",
+        position: "팀장",
+        authority: AUTHORITY.LEADER,
+        isAdmin: false,
+        roleLabel: null,
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2024-02-19",
+        pendingHandoverType: null,
       },
-    ],
-    pendingHandover: null,
-  },
-  {
-    member: {
-      id: 5,
-      name: "최유진",
-      email: "yujin@zgroup.co.kr",
-      teamName: "마케팅팀",
-      position: "팀장",
-      authority: AUTHORITY.LEADER,
-      isAdmin: false,
-      roleLabel: null,
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2023-04-20",
-      pendingHandoverType: null,
+      actions: [],
+      pendingHandover: null,
     },
-    actions: [],
-    pendingHandover: null,
-  },
-  {
-    member: {
-      id: 6,
-      name: "정민석",
-      email: "minseok@zgroup.co.kr",
-      teamName: "마케팅팀",
-      position: "대리",
-      authority: AUTHORITY.MEMBER,
-      isAdmin: false,
-      roleLabel: "브랜드",
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2020-09-01",
-      pendingHandoverType: null,
-    },
-    actions: [],
-    pendingHandover: null,
-  },
-  {
-    member: {
-      id: 7,
-      name: "강서연",
-      email: "seoyeon@zgroup.co.kr",
-      teamName: "디자인팀",
-      position: "팀장",
-      authority: AUTHORITY.LEADER,
-      isAdmin: false,
-      roleLabel: null,
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2024-02-19",
-      pendingHandoverType: null,
-    },
-    actions: [],
-    pendingHandover: null,
-  },
-  {
-    /* ⚠️ 오프보딩 대기도 하나 — 휴직과 문구·결과가 다르다 */
-    member: {
-      id: 8,
-      name: "임지안",
-      email: "jian@zgroup.co.kr",
-      teamName: "마케팅팀",
-      position: "사원",
-      authority: AUTHORITY.MEMBER,
-      isAdmin: false,
-      roleLabel: "캠페인",
-      status: MEMBER_STATUS.WAITING,
-      joinedAt: "2024-06-01",
-      pendingHandoverType: null,
-    },
-    actions: [
-      {
-        id: "a-105",
-        title: "8월 캠페인 소재 정리",
-        status: ACTION_STATUS.IN_PROGRESS,
-        dueDate: "2026-08-20",
+    {
+      /* ⚠️ 오프보딩 대기도 하나 — 휴직과 문구·결과가 다르다 */
+      member: {
+        id: 8,
+        name: "임지안",
+        email: "jian@zgroup.co.kr",
+        teamName: "마케팅팀",
+        position: "사원",
+        authority: AUTHORITY.MEMBER,
+        isAdmin: false,
+        roleLabel: "캠페인",
+        status: MEMBER_STATUS.WAITING,
+        joinedAt: "2024-06-01",
+        pendingHandoverType: null,
       },
-    ],
-    pendingHandover: {
-      id: "h-302",
-      type: HANDOVER_TYPE.OFFBOARDING,
-      period: null,
-      actionCount: 5,
-      midApproval: { approverName: "최유진", approvedAt: "2026-08-01" },
-      requesterAuthority: AUTHORITY.MEMBER,
+      /*
+        ⚠️ **담당 액션이 없다.** 팀장 중간 승인(최유진)이 끝난 신청이라 넘길 액션은 이미 재할당됐다 —
+           `캠페인 소재 정리`(a-105)는 정민석(id 6)이 맡고 있다. BE 시드(인수인계 302)도 액션 105를
+           6번에게 옮긴다(#10).
+      */
+      actions: [],
+      handedOver: [{ actionId: "a-105", toMemberId: 6 }],
+      pendingHandover: {
+        id: "h-302",
+        type: HANDOVER_TYPE.OFFBOARDING,
+        period: null,
+        /* ⚠️ 넘긴 항목은 1건(`캠페인 소재 정리`)이다 — BE 시드(인수인계 302)와 같다. 담당 액션 수와는 별개다 */
+        actionCount: 1,
+        midApproval: { approverName: "최유진", approvedAt: addDaysIso(today, -2) },
+      },
     },
-  },
-  {
-    member: {
-      id: 9,
-      name: "오현우",
-      email: "hyunwoo@zgroup.co.kr",
-      teamName: "전략기획팀",
-      position: "과장",
-      authority: AUTHORITY.LEADER,
-      isAdmin: false,
-      roleLabel: null,
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2021-11-08",
-      pendingHandoverType: null,
+    {
+      member: {
+        id: 9,
+        name: "오현우",
+        email: "hyunwoo@zgroup.co.kr",
+        teamName: "전략기획팀",
+        position: "과장",
+        authority: AUTHORITY.LEADER,
+        isAdmin: false,
+        roleLabel: null,
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2021-11-08",
+        pendingHandoverType: null,
+      },
+      actions: [],
+      pendingHandover: null,
     },
-    actions: [],
-    pendingHandover: null,
-  },
-  {
-    member: {
-      id: 10,
-      name: "한소율",
-      email: "soyul@zgroup.co.kr",
-      teamName: "디자인팀",
-      position: "사원",
-      authority: AUTHORITY.MEMBER,
-      isAdmin: false,
-      roleLabel: "비주얼",
-      status: MEMBER_STATUS.ACTIVE,
-      joinedAt: "2024-08-12",
-      pendingHandoverType: null,
+    {
+      member: {
+        id: 10,
+        name: "한소율",
+        email: "soyul@zgroup.co.kr",
+        teamName: "디자인팀",
+        position: "사원",
+        authority: AUTHORITY.MEMBER,
+        isAdmin: false,
+        roleLabel: "비주얼",
+        status: MEMBER_STATUS.ACTIVE,
+        joinedAt: "2024-08-12",
+        pendingHandoverType: null,
+      },
+      actions: [],
+      pendingHandover: null,
     },
-    actions: [],
-    pendingHandover: null,
-  },
-];
+  ];
+}
 
 /*
   ⚠️ `structuredClone`을 쓰지 않는다. Node엔 있지만 **jsdom 테스트 환경에는 없어서**
@@ -282,7 +325,7 @@ function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
-let store: MockManagedMemberEntry[] = clone(INITIAL);
+let store: MockManagedMemberEntry[] = buildInitial(todayIso());
 
 /**
  * 화면에 내보낼 사원들.
@@ -309,15 +352,30 @@ export function listMockManagedMembers(): ManagedMember[] {
  *    있어서, 그 팀의 역할 목록과 대조해야 id를 찾을 수 있다 — 그건 팀 목록을 아는
  *    `manage-server.ts`(`getManagedMember`)가 `roleIdOf`로 채운다.
  */
-export function findMockManagedMember(id: number): Omit<ManagedMemberDetail, "roleId"> | null {
+export function findMockManagedMember(
+  id: number,
+  { isViewerOwner = false }: { isViewerOwner?: boolean } = {},
+): Omit<ManagedMemberDetail, "roleId"> | null {
   const found = store.find((entry) => entry.member.id === id);
   if (!found) return null;
 
   const entry = clone(found);
+  /*
+    ⚠️ **조회자를 모르면 대표가 아닌 것으로 본다** — 버튼이 잠기는 쪽이 안전하다.
+    ⚠️ 팀장인지는 **지금 권한**으로 본다(BE `approvalFor`가 지금 팀장 id와 비교한다).
+  */
+  const pendingHandover = entry.pendingHandover && {
+    ...entry.pendingHandover,
+    ...evaluateFinalApproval({
+      hasMidApproval: entry.pendingHandover.midApproval !== null,
+      isWriterCurrentLeader: entry.member.authority === AUTHORITY.LEADER,
+      isViewerOwner,
+    }),
+  };
   return {
     member: entry.member,
     actions: { items: entry.actions, totalCount: entry.actions.length },
-    pendingHandover: entry.pendingHandover,
+    pendingHandover,
   };
 }
 
@@ -381,6 +439,8 @@ export function approveMockHandover(id: number): void {
         authority: !isVacation && wasLeader ? AUTHORITY.MEMBER : entry.member.authority,
       },
       pendingHandover: null,
+      // 승인하면 넘긴 액션은 받은 사람에게 그대로 남는다 — 되돌릴 기록을 지운다
+      handedOver: [],
     };
   });
 }
@@ -404,14 +464,74 @@ export function completeMockHandoverMidApproval(
   );
 }
 
-/** 반려 — 신청을 치우고 사람은 재직으로 되돌린다 */
+/**
+ * 인계 대상 액션 — 신청자가 들고 있는 **미완료** 액션(#27).
+ * ⚠️ BE 시드(인수인계 301)도 미완료 101·102·106만 담는다 — 완료(a-103)는 넘길 일이 없다.
+ */
+export function listMockHandoverActions(memberId: number): ManagedMemberAction[] {
+  const entry = store.find((candidate) => candidate.member.id === memberId);
+  if (!entry) return [];
+  return clone(entry.actions).filter((action) => action.status !== ACTION_STATUS.DONE);
+}
+
+/**
+ * 팀장 재배정 한 건 — 신청자의 액션을 팀원에게 옮기고, 반려 때 되돌릴 기록을 남긴다(#27).
+ * ⚠️ BE도 재배정을 그 자리에서 반영하고 반려 때 되돌린다(`rollbackCommittedReassignments`) —
+ *    기록(`handedOver`)을 안 남기면 반려해도 일이 안 돌아온다(`rejectMockHandover`).
+ */
+export function reassignMockHandoverAction(
+  requesterId: number,
+  actionId: string,
+  toMemberId: number,
+): void {
+  const requester = store.find((entry) => entry.member.id === requesterId);
+  const action = requester?.actions.find((candidate) => candidate.id === actionId);
+  if (!requester || !action || requesterId === toMemberId) return;
+  if (!store.some((entry) => entry.member.id === toMemberId)) return;
+
+  store = store.map((entry) => {
+    if (entry.member.id === requesterId) {
+      return {
+        ...entry,
+        actions: entry.actions.filter((candidate) => candidate.id !== actionId),
+        handedOver: [...(entry.handedOver ?? []), { actionId, toMemberId }],
+      };
+    }
+    if (entry.member.id === toMemberId) {
+      return { ...entry, actions: [...entry.actions, action] };
+    }
+    return entry;
+  });
+}
+
+/**
+ * 반려 — 신청자를 재직으로 되돌리고, **중간 승인으로 넘어간 액션을 원래 담당자에게 돌려준다**.
+ * ⚠️ BE와 같은 결과여야 한다(`HandoverService.reject` → `rollbackCommittedReassignments`) —
+ *    목만 액션을 받은 사람에게 남겨 두면 데모에서 "반려했는데 일이 안 돌아왔다"로 보인다.
+ */
 export function rejectMockHandover(id: number): void {
+  const requester = store.find((entry) => entry.member.id === id && entry.pendingHandover);
+  if (!requester) return;
+
+  const handedOver = requester.handedOver ?? [];
+  const returned: ManagedMemberAction[] = [];
+
+  store = store.map((entry) => {
+    const moved = handedOver.filter((item) => item.toMemberId === entry.member.id);
+    if (moved.length === 0) return entry;
+    const movedIds = new Set(moved.map((item) => item.actionId));
+    returned.push(...entry.actions.filter((action) => movedIds.has(action.id)));
+    return { ...entry, actions: entry.actions.filter((action) => !movedIds.has(action.id)) };
+  });
+
   store = store.map((entry) =>
-    entry.member.id === id && entry.pendingHandover
+    entry.member.id === id
       ? {
           ...entry,
           member: { ...entry.member, status: MEMBER_STATUS.ACTIVE },
+          actions: [...entry.actions, ...returned],
           pendingHandover: null,
+          handedOver: [],
         }
       : entry,
   );
@@ -464,5 +584,5 @@ export function listMockMemberEmails(): string[] {
 
 /** 테스트가 앞 테스트의 변경을 물려받지 않게 되돌린다 */
 export function resetMockManagedMembers(): void {
-  store = clone(INITIAL);
+  store = buildInitial(todayIso());
 }

@@ -1,5 +1,6 @@
 import { AUTHORITY, type Authority } from "@/constants/authority";
 import type { ActionStatus } from "@/constants/domain";
+import { HANDOVER_TYPE, type HandoverType } from "@/constants/handover";
 import { type MemberStatus, ROLE_NONE_LABEL } from "@/constants/member";
 
 import type { ManagedMember, ManagedMemberAction, MemberFilter } from "./manage-types";
@@ -35,8 +36,10 @@ export interface BeCompanyAction {
  *    되어 **입사일 열이 통째로 빈칸**으로 뜬다 — 값이 없는 것과 구분이 안 된다.
  * ⚠️ **목록에는 `email`이 없다.** 표가 그 열을 안 그리므로(WORKFLOW §9: 이름·팀·직급·권한·
  *    역할·상태·입사일) 문제가 아니고, 상세(`BeMemberDetail`)에는 있다.
- * ⚠️ **목록에는 `pendingHandoverType`도 없다.** 거르기는 이제 서버가 하므로(`filter`
- *    파라미터) 화면이 그 값을 볼 일이 없다 — 목으로 돌 때만 쓰인다.
+ * ⚠️ **목록에도 `pendingHandoverType`이 온다**(BE PR #9, 2026-11-03 — BE `MemberListItemResponse`
+ *    대조). 대기 신청이 없으면 `null`이고, 값은 `workStatus`가 `WAITING`일 때만 채워진다.
+ *    거르기는 서버(`filter` 파라미터)가 하지만, 목록 줄에서 휴직·오프보딩을 나눠 그리려면
+ *    이 값이 있어야 한다.
  */
 export interface BeMemberListItem {
   memberId: number;
@@ -49,6 +52,11 @@ export interface BeMemberListItem {
   workStatus: string;
   /** `2020-01-02` — Jackson이 `LocalDate`를 ISO 문자열로 내린다 */
   joinedOn: string | null;
+  /**
+   * 대기 중인 인수인계 신청 종류 — `VACATION` · `OFFBOARDING`, 신청이 없으면 `null`.
+   * ⚠️ **선택적이라고 적는다.** BE PR #9가 배포되기 전에는 이 필드 자체가 안 온다(`undefined`).
+   */
+  pendingHandoverType?: string | null;
 }
 
 /**
@@ -120,6 +128,19 @@ function toMemberStatus(workStatus: string): MemberStatus {
   return workStatus as MemberStatus;
 }
 
+/**
+ * 대기 신청 종류 → 우리 상수.
+ *
+ * ⚠️ **모르는 값·없는 값은 `null`이다.** 이 값으로 `HANDOVER_TYPE_LABEL[type]`을 찾아 문구를
+ *    만드는데, 원문을 그대로 넘기면 BE가 종류를 하나 늘렸을 때 라벨이 `undefined`로 뜬다.
+ *    `null`이면 화면은 종류를 모르는 대기로 그리고, 틀린 종류를 말하지 않는다(§정직성).
+ */
+function toPendingHandoverType(raw: string | null | undefined): HandoverType | null {
+  if (raw === HANDOVER_TYPE.VACATION) return HANDOVER_TYPE.VACATION;
+  if (raw === HANDOVER_TYPE.OFFBOARDING) return HANDOVER_TYPE.OFFBOARDING;
+  return null;
+}
+
 export function toManagedMember(item: BeMemberListItem | BeMemberDetail): ManagedMember {
   return {
     id: item.memberId,
@@ -150,10 +171,10 @@ export function toManagedMember(item: BeMemberListItem | BeMemberDetail): Manage
     status: toMemberStatus(item.workStatus),
     joinedAt: item.joinedOn ?? "",
     /*
-      ⚠️ **목록 응답에 없다.** 휴직·오프보딩 대기 구분은 이제 서버 `filter`가 하므로
-         화면이 이 값을 볼 일이 없다 — 목으로 돌 때만 채워진다.
+      ⚠️ **목록 응답이 준다**(BE PR #9). 상세 응답(`BeMemberDetail`)에는 없어 `null`이 되고,
+         상세의 신청 정보는 `ManagedMemberDetail.pendingHandover`가 따로 든다.
     */
-    pendingHandoverType: null,
+    pendingHandoverType: toPendingHandoverType(item.pendingHandoverType),
   };
 }
 

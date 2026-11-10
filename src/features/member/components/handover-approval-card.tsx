@@ -2,7 +2,7 @@
 
 import { CircleAlert, Download } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useId, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { ConfirmDialog } from "@/components/common/confirm-dialog";
@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { AUTHORITY, type Authority } from "@/constants/authority";
 import {
+  FINALIZE_BLOCK_FALLBACK_LABEL,
+  FINALIZE_BLOCK_REASON_LABEL,
   HANDOVER_APPLICANT_TYPE_LABEL,
   HANDOVER_TYPE,
   HANDOVER_TYPE_LABEL,
@@ -27,14 +29,12 @@ interface HandoverApprovalCardProps {
   /** 제목에 "팀장/사원"을 붙이는 데만 쓴다 — 승인 판정과는 무관하다(그건 `canApprove`). */
   memberAuthority: Authority;
   handover: PendingHandover;
-  /** OWNER만 참이다 — Admin 겸직자는 화면엔 들어와도 이 버튼이 없다(WORKFLOW §11) */
-  canApprove: boolean;
   /**
-   * **신청 당시** 그 사람이 팀장이었는지(`handover.requesterAuthority` 기준) — 중간 승인
-   * 문구·귀속 안내 링크의 분기에 쓴다. `memberAuthority`(지금 권한, 제목용)와는 값이 갈릴
-   * 수 있다 — 팀장 공석 중 승급되면 신청 당시엔 일반 팀원이었어도 지금은 팀장이라서다.
+   * OWNER만 참이다 — Admin 겸직자는 화면엔 들어와도 버튼이 없다(WORKFLOW §11).
+   * ⚠️ **버튼을 그릴지**만 정한다. 최종 승인을 지금 누를 수 있는지는 `handover.canFinalize`
+   *    (BE 판정)가 정한다 — 반려는 그 값으로 잠그지 않는다.
    */
-  isRequesterLeader: boolean;
+  canApprove: boolean;
 }
 
 /**
@@ -64,7 +64,6 @@ export function HandoverApprovalCard({
   memberAuthority,
   handover,
   canApprove,
-  isRequesterLeader,
 }: HandoverApprovalCardProps) {
   const [reason, setReason] = useState("");
   /**
@@ -96,6 +95,25 @@ export function HandoverApprovalCard({
 
   const isVacation = handover.type === HANDOVER_TYPE.VACATION;
   const typeLabel = HANDOVER_TYPE_LABEL[handover.type];
+  /*
+    ⚠️ **최종 승인은 BE 판정(`canFinalize`)으로만 잠근다.** 예전엔 권한·중간 승인으로 여기서
+       추정했는데(#6), BE 규칙(지금 그 팀 팀장인지)과 갈릴 수 있어 BE가 판정을 내려 주게
+       했다. 잠긴 이유는 BE 사유 코드를 문장으로 옮겨 버튼에 잇는다 — 이유 없는 회색 버튼이
+       아니다. 서버도 승인 요청 때 다시 막는다(조회 뒤 상태가 바뀔 수 있다).
+    ⚠️ 반려는 열어 둔다 — 최종 승인 판정과 무관하게 서버가 받는다.
+  */
+  const finalizeBlockMessage = handover.canFinalize
+    ? null
+    : handover.finalizeBlockReason
+      ? FINALIZE_BLOCK_REASON_LABEL[handover.finalizeBlockReason]
+      : FINALIZE_BLOCK_FALLBACK_LABEL;
+  const blockReasonId = useId();
+  /*
+    ⚠️ **중간 승인 단계가 없는 신청**(지금 그 팀 팀장의 본인 신청)은 BE 값으로 가른다 —
+       중간 승인 기록도 없고 더 받을 필요도 없으면 그 길이다. 신청 당시 직책은 BE가 주지
+       않으므로 여기서 지어내지 않는다.
+  */
+  const isDirectLeaderPath = !handover.midApproval && !handover.requiresIntermediateApproval;
   /*
     ⚠️ **제목에 팀장/사원을 박아 넣는다**(사용자 확정, 2026-08-08) — 전에는 본문을 읽어야만
        팀장 본인 신청인지 알 수 있었다. "팀장 휴직"·"사원 오프보딩"처럼 넷을 한눈에
@@ -145,10 +163,16 @@ export function HandoverApprovalCard({
         <h2 className="text-[17px] leading-7 font-semibold tracking-[-0.3px]">
           {applicantTypeLabel} {typeLabel} 최종 승인 대기
         </h2>
-        {/* ⚠️ 배지도 명도로 세운다 — 이 화면에서 제일 진한 표식이라 색 없이도 먼저 읽힌다 */}
-        <span className="bg-foreground text-background shrink-0 rounded px-2 py-0.5 text-[11px] leading-4 font-medium">
-          검토 필요
-        </span>
+        {/*
+          ⚠️ 배지도 명도로 세운다 — 이 화면에서 제일 진한 표식이라 색 없이도 먼저 읽힌다
+          ⚠️ **승인할 수 있는 사람에게만** 단다(디자인 시안 ③, #16). 겸직 관리자에게 "검토 필요"를
+             띄우면 할 일이 있다고 말하면서 아래에선 "대표만 할 수 있습니다"라고 해 서로 어긋난다.
+        */}
+        {canApprove && (
+          <span className="bg-foreground text-background shrink-0 rounded px-2 py-0.5 text-[11px] leading-4 font-medium">
+            검토 필요
+          </span>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 px-7 pb-6">
@@ -194,7 +218,7 @@ export function HandoverApprovalCard({
         <p className="border-border bg-secondary/40 text-muted-foreground rounded-lg border px-4 py-3 text-[13px] leading-5 break-keep">
           {handover.midApproval
             ? `${handover.midApproval.approverName} 리더가 ${formatMonthDayWeekday(handover.midApproval.approvedAt)} 중간 승인했습니다.`
-            : isRequesterLeader
+            : isDirectLeaderPath
               ? isVacation
                 ? "팀장 본인 신청이라 중간 승인 단계 없이 올라왔습니다. 재할당은 본인이 마쳤습니다."
                 : "팀장 오프보딩이라 중간 승인 단계 없이 올라왔습니다. 승인 뒤 인수인계서를 새 팀장에게 귀속해야 합니다."
@@ -205,7 +229,7 @@ export function HandoverApprovalCard({
           ⚠️ 팀장 오프보딩은 승인이 끝이 아니다 — 인수인계서를 새 팀장에게 귀속해야 완결된다
              (WORKFLOW §7). 갈 곳을 여기서 알려 준다.
         */}
-        {isRequesterLeader && !isVacation && !handover.midApproval && (
+        {isDirectLeaderPath && !isVacation && (
           <Link
             href="/owner/leader-handovers"
             className="text-muted-foreground hover:text-foreground text-[12px] leading-4 underline underline-offset-2"
@@ -236,8 +260,30 @@ export function HandoverApprovalCard({
           </Button>
         )}
 
+        {/*
+          ⚠️ **버튼이 없는 이유를 적는다**(디자인 시안 ③). 이 화면에 들어오는데 승인 권한이
+             없는 사람은 겸직 관리자뿐이다 — 말없이 버튼만 비우면 고장 난 줄 안다.
+        */}
+        {!canApprove && (
+          <p className="text-muted-foreground text-right text-[12px] leading-4">
+            최종 승인·반려는 대표만 할 수 있습니다.
+          </p>
+        )}
+
         {canApprove && (
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex flex-wrap items-center justify-end gap-x-3 gap-y-2">
+            {/*
+              ⚠️ **잠긴 이유를 버튼 옆에 적는다**(BE 사유 코드 → 문장). 프로젝트 생성 버튼과
+                 같은 문법이다(#18) — 버튼만 회색이면 왜 못 누르는지 모른다.
+            */}
+            {finalizeBlockMessage && (
+              <p
+                id={blockReasonId}
+                className="text-muted-foreground text-[12px] leading-4 break-keep"
+              >
+                {finalizeBlockMessage}
+              </p>
+            )}
             <Button
               type="button"
               size="sm"
@@ -256,7 +302,8 @@ export function HandoverApprovalCard({
               type="button"
               size="sm"
               variant="ink"
-              disabled={isPending}
+              disabled={isPending || !handover.canFinalize}
+              aria-describedby={finalizeBlockMessage ? blockReasonId : undefined}
               onClick={() => {
                 setError(null);
                 setConfirming("approve");
@@ -308,8 +355,11 @@ export function HandoverApprovalCard({
 
       {/*
         ⚠️ 반려는 되돌릴 수 없다 — **무엇이 일어나는지** 적고 한 번 더 받는다.
-           휴직과 오프보딩은 되돌아가는 자리가 같지만(재직), 신청한 사람이 다시 밟을 절차가
-           달라서 유형을 문장에 적는다.
+        ⚠️ **인계된 액션은 돌아온다 — 휴직도 오프보딩도**(#16, #20). BE는 반려 때 유형과
+           상관없이 중간 승인으로 넘긴 액션을 원래 담당자에게 되돌린다
+           (`HandoverService.rollbackCommittedReassignments`). 예전엔 오프보딩에 "되돌아오지
+           않습니다"라고 적어 반대로 말했고(#16에서 고침), 휴직은 이 사실을 아예 안 적었다.
+           두 유형이 같은 일을 겪으니 문장도 하나다(성진님 확인, 2026-11-09).
         ⚠️ **사유도 이 창에서 받는다.** 전에는 카드 안에 붉은 칸이 펼쳐지고 그다음 확인 창이
            떠서, 같은 한 가지 일을 두 번 물었다 — 게다가 그 붉은 면은 "색으로 알리는 건
            에러뿐"(§디자인 토큰)에 어긋났다. 되돌릴 수 없는 일을 묻는 자리는 공용 확인 창
@@ -329,9 +379,7 @@ export function HandoverApprovalCard({
           <>
             신청이 되돌아가고 다시 재직 상태가 됩니다.
             <br />
-            {isVacation
-              ? "다시 신청하려면 인수인계부터 새로 밟아야 합니다."
-              : "이미 넘긴 액션은 되돌아오지 않습니다."}
+            인계된 액션은 원래 담당자에게 돌아갑니다.
           </>
         }
         confirmLabel="반려"

@@ -207,4 +207,69 @@ describe("getManagedMember — 실서버 roleId", () => {
 
     expect(result?.roleId).toBeNull();
   });
+
+  /*
+    ⚠️ **최종 승인 판정은 BE 값을 그대로 옮긴다** — `momo/handover-approval`(머지 전).
+       필드가 없는 옛 BE면 잠근 쪽(거짓)으로 읽혀야 한다 — 열린 쪽으로 읽으면 못 할 승인을 누른다.
+  */
+  function stubPendingHandover(summary: Record<string, unknown>) {
+    serverApiMock.mockImplementation((url: string) => {
+      if (url === "/api/members/4") return Promise.resolve(detail());
+      if (url.startsWith("/api/handovers") && url.includes("SUBMITTED")) {
+        return Promise.resolve([
+          {
+            id: 301,
+            writerMemberId: 4,
+            handoverType: "VACATION",
+            status: "SUBMITTED",
+            leaveStartAt: "2026-11-12T00:00:00",
+            leaveEndAt: "2026-11-16T00:00:00",
+            itemCount: 3,
+            ...summary,
+          },
+        ]);
+      }
+      if (url.startsWith("/api/handovers")) return Promise.resolve([]);
+      if (url.startsWith("/api/company/actions")) {
+        return Promise.resolve({ content: [], totalElements: 0 });
+      }
+      throw new Error(`이 테스트가 예상하지 않은 serverApi 호출: ${url}`);
+    });
+  }
+
+  it("BE의 canFinalize·requiresIntermediateApproval·finalizeBlockReason을 그대로 옮긴다", async () => {
+    stubPendingHandover({
+      canFinalize: false,
+      requiresIntermediateApproval: true,
+      finalizeBlockReason: "INTERMEDIATE_APPROVAL_REQUIRED",
+    });
+
+    const result = await getManagedMember(4);
+
+    expect(result?.pendingHandover).toMatchObject({
+      canFinalize: false,
+      requiresIntermediateApproval: true,
+      finalizeBlockReason: "INTERMEDIATE_APPROVAL_REQUIRED",
+    });
+  });
+
+  it("필드가 없는 BE면 잠근 쪽으로 읽는다", async () => {
+    stubPendingHandover({});
+
+    const result = await getManagedMember(4);
+
+    expect(result?.pendingHandover).toMatchObject({
+      canFinalize: false,
+      requiresIntermediateApproval: false,
+      finalizeBlockReason: null,
+    });
+  });
+
+  it("모르는 사유 코드는 null로 받는다", async () => {
+    stubPendingHandover({ canFinalize: false, finalizeBlockReason: "SOMETHING_NEW" });
+
+    const result = await getManagedMember(4);
+
+    expect(result?.pendingHandover?.finalizeBlockReason).toBeNull();
+  });
 });

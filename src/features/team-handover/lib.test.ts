@@ -1,4 +1,5 @@
 import { ACTION_STATUS } from "@/constants/domain";
+import { buildActionTimeline } from "@/features/member/action-timeline";
 import { pickPaletteColor } from "@/lib/palette";
 
 import { buildTimelineInput, isReadyToComplete, toAssignmentList } from "./lib";
@@ -51,6 +52,30 @@ describe("buildTimelineInput — 액션 → 타임라인 입력", () => {
       startDate: "2026-08-05",
       dueDate: "2026-08-15",
     });
+  });
+
+  it("시작일이 없으면(빈 문자열) 마감일로 대체한다 — 하루짜리 막대, 시작일을 지어내지 않는다 (#23)", () => {
+    const [row] = buildTimelineInput([action({ startDate: "", dueDate: "2026-08-12" })]);
+
+    expect(row).toMatchObject({ startDate: "2026-08-12", dueDate: "2026-08-12" });
+  });
+
+  it("시작일이 없는 액션이 섞여도 타임라인 축·막대에 NaN이 생기지 않는다 (#23)", () => {
+    const model = buildActionTimeline(
+      buildTimelineInput([
+        action({ id: 1, startDate: "2026-08-05", dueDate: "2026-08-15" }),
+        action({ id: 2, startDate: "", dueDate: "2026-08-12" }),
+      ]),
+      new Date("2026-08-10T09:00:00"),
+    );
+
+    expect(model).not.toBeNull();
+    expect(model?.monthLabel).not.toContain("NaN");
+    expect(Number.isFinite(model?.totalWidthPx)).toBe(true);
+    for (const bar of model?.bars ?? []) {
+      expect(Number.isFinite(bar.leftPx)).toBe(true);
+      expect(bar.widthPx).toBeGreaterThan(0);
+    }
   });
 
   it("색은 프로젝트 태그로 결정된다 — 같은 태그면 같은 색(§palette)", () => {

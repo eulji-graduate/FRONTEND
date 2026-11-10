@@ -84,10 +84,14 @@ Z는 이 흐름을 회의 → AI 분석 → 액션 분배 → 관리 → 인수�
 
 ## 시작하기
 
+배포 없이 각자 PC에서만 돌립니다. `.env` 없이도 목 데이터로 화면이 뜹니다.
+
 ```bash
 npm install     # git 훅도 함께 설치됩니다
 npm run dev     # http://localhost:3000
 ```
+
+실제 BE(`http://localhost:8080`)에 붙이려면 `.env.example`을 `.env.local`로 복사하고, 팀 채팅방에서 받은 값을 채운 뒤 `NEXT_PUBLIC_USE_MOCK=false`를 켭니다. 접속은 `localhost`로만 합니다 — IP로 열면 Server Action·마이크가 막힙니다.
 
 올리기 전에 아래 네 개를 돌려보면 CI에서 막히는 일이 줄어듭니다.
 

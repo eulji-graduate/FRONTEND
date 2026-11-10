@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { AccessDenied } from "@/components/common/access-denied";
-import { AUTHORITY } from "@/constants/authority";
 import { getCompanyOrg } from "@/features/company/server";
 import { HandoverApprovalCard } from "@/features/member/components/handover-approval-card";
 import { MemberActionList } from "@/features/member/components/member-action-list";
@@ -43,7 +42,8 @@ export default async function ManageMemberDetailPage({
   const viewer = await getViewer();
   if (!canManageMembers(viewer)) return <AccessDenied homeHref={roleHome(viewer.role)} />;
 
-  const detail = await getManagedMember(id);
+  /* ⚠️ `viewer`는 목에서만 쓴다 — 최종 승인 판정이 조회자마다 다르다(실서버는 BE가 판정) */
+  const detail = await getManagedMember(id, viewer);
   if (!detail) notFound();
 
   /*
@@ -64,22 +64,17 @@ export default async function ManageMemberDetailPage({
         {/*
           ⚠️ 곁 컬럼은 **360px**이다(DESIGN: 곁 컬럼 고정폭). 사람 카드는 폭이 늘어나도
              얻는 게 없다.
-          ⚠️ **왼쪽은 이 사람, 오른쪽은 이 사람을 두고 할 일이다.** 직급·권한은 그 사람에게
-             붙은 값이라 이름·이메일·입사일 바로 아래에 이어 붙는다 — 오른쪽 머리에 두면
-             고를 게 셋뿐인 폼이 본 칸을 차지하고 정작 승인·액션이 아래로 밀린다.
-          ⚠️ 폼이 좁은 칸에 들어가도 칸이 안 잘린다 — 카드가 `@container`로 제 폭을 보고
-             한 열로 접는다(`member-grade-card`).
-          ⚠️ 폼을 전폭에 두지 않는다 — 입력칸만 넓어지고 라벨과 값이 멀어진다.
+          ⚠️ **왼쪽은 이 사람, 오른쪽은 이 사람을 두고 할 일이다.** 직급·권한 변경도 할 일이라
+             오른쪽 **맨 아래**(담당 액션 밑)에 둔다(디자인 시안 ④, #14). 예전엔 이름 바로
+             아래 왼쪽에 붙였는데, 그러면 곁 컬럼만 길어지고 오른쪽 승인·액션과 높이가 어긋났다.
+             맨 아래라 승인·액션을 밀어내지도 않는다.
+          ⚠️ 칸이 넓어져도 카드가 `@container`로 제 폭을 보고 배치를 정한다(`member-grade-card`).
         */}
         <div className="grid grid-cols-1 items-start gap-7 lg:grid-cols-[360px_minmax(0,1fr)]">
           <div className="flex flex-col gap-7">
-            <MemberProfileCard member={detail.member} />
-            <MemberGradeCard
+            <MemberProfileCard
               member={detail.member}
-              canEdit={canChangeMemberGrade(viewer)}
-              positionNames={positionNames}
-              roleOptions={roleOptions}
-              currentRoleId={detail.roleId}
+              pendingHandoverType={detail.pendingHandover?.type ?? null}
             />
           </div>
 
@@ -101,17 +96,18 @@ export default async function ManageMemberDetailPage({
                 memberAuthority={detail.member.authority}
                 handover={detail.pendingHandover}
                 canApprove={canApproveFinal(viewer)}
-                /*
-                  ⚠️ **신청 당시** 권한을 쓴다(`pendingHandover.requesterAuthority`) —
-                     지금 권한(`detail.member.authority`)을 쓰면 팀장 공석 중 승급된
-                     사람의 예전 일반 팀원 신청이 "팀장 본인 신청"으로 잘못 보인다
-                     (CodeRabbit 지적, 2026-08-09).
-                */
-                isRequesterLeader={detail.pendingHandover.requesterAuthority === AUTHORITY.LEADER}
               />
             )}
 
             <MemberActionList actions={detail.actions} />
+
+            <MemberGradeCard
+              member={detail.member}
+              canEdit={canChangeMemberGrade(viewer)}
+              positionNames={positionNames}
+              roleOptions={roleOptions}
+              currentRoleId={detail.roleId}
+            />
           </div>
         </div>
       </div>
