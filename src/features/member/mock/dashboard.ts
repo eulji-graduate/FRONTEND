@@ -1,12 +1,17 @@
 import type { DashboardMeeting } from "@/components/common/dashboard-meeting-item";
 import { ACTION_STATUS, MEETING_STATUS } from "@/constants/domain";
+import { createMockClock } from "@/mocks/rebase-date";
 
 import type { MemberAction } from "../types";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-05다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-05");
 
 /**
  * ⚠️ 목 데이터 — BE 연동 전(ERD·API 스펙 미확정, DECISIONS.md).
  * 로그인 사원 = 이하윤(개발팀·프론트엔드) 기준. 아래는 이하윤 본인의 액션·참석 회의다.
- * 오늘(2026-08-05) 기준으로 마감 임박·연체가 섞이도록 날짜를 잡았다.
+ * 오늘(2026-08-05) 기준으로 마감 임박·연체가 섞이도록 날짜를 잡았고, 그날을 실제 오늘로 옮긴다(`clock`).
+ * 아래 `D+2`·`D-1` 같은 주석은 옮기기 전(2026-08-05) 기준 표기이고 오늘과의 간격은 그대로다.
  *
  * 시작일은 타임라인 기간 바의 왼쪽 끝이라 상태와 아귀가 맞게 잡았다:
  *  - 지연(마감 경과) = 시작·마감 모두 과거
@@ -21,16 +26,16 @@ export const MEMBER_ACTIONS_MOCK: MemberAction[] = [
     title: "로그인 폼 검증 로직 구현",
     projectTag: "GOODS",
     status: ACTION_STATUS.IN_PROGRESS,
-    startDate: "2026-08-01",
-    dueDate: "2026-08-03", // 연체(D+2)
+    startDate: clock.at("2026-08-01"),
+    dueDate: clock.at("2026-08-03"), // 연체(D+2)
   },
   {
     id: "ma2",
     title: "접근성 점검 - 키보드 내비게이션",
     projectTag: "COLLAB",
     status: ACTION_STATUS.IN_PROGRESS,
-    startDate: "2026-08-01",
-    dueDate: "2026-08-04", // 연체(D+1)
+    startDate: clock.at("2026-08-01"),
+    dueDate: clock.at("2026-08-04"), // 연체(D+1)
   },
   {
     id: "ma3",
@@ -38,48 +43,48 @@ export const MEMBER_ACTIONS_MOCK: MemberAction[] = [
     projectTag: "GOODS",
     // 시작일이 오늘이라 미착수 '할 일'이 아니라 오늘부터 하는 '진행중'이다(오늘선에 걸침).
     status: ACTION_STATUS.IN_PROGRESS,
-    startDate: "2026-08-05",
-    dueDate: "2026-08-06", // D-1
+    startDate: clock.at("2026-08-05"),
+    dueDate: clock.at("2026-08-06"), // D-1
   },
   {
     id: "ma4",
     title: "온보딩 플로우 와이어프레임 검토",
     projectTag: "GOODS",
     status: ACTION_STATUS.IN_PROGRESS,
-    startDate: "2026-08-04",
-    dueDate: "2026-08-08", // D-3 (오늘 걸침)
+    startDate: clock.at("2026-08-04"),
+    dueDate: clock.at("2026-08-08"), // D-3 (오늘 걸침)
   },
   {
     id: "ma5",
     title: "회원가입 API 연동",
     projectTag: "GOODS",
     status: ACTION_STATUS.TODO,
-    startDate: "2026-08-09",
-    dueDate: "2026-08-11", // D-6
+    startDate: clock.at("2026-08-09"),
+    dueDate: clock.at("2026-08-11"), // D-6
   },
   {
     id: "ma6",
     title: "상품 목록 무한 스크롤 구현",
     projectTag: "GOODS",
     status: ACTION_STATUS.TODO,
-    startDate: "2026-08-10",
-    dueDate: "2026-08-12", // D-7
+    startDate: clock.at("2026-08-10"),
+    dueDate: clock.at("2026-08-12"), // D-7
   },
   {
     id: "ma7",
     title: "실시간 알림 UI 작업",
     projectTag: "COLLAB",
     status: ACTION_STATUS.TODO,
-    startDate: "2026-08-25",
-    dueDate: "2026-08-30", // D-25 (처리할 액션 제외)
+    startDate: clock.at("2026-08-25"),
+    dueDate: clock.at("2026-08-30"), // D-25 (처리할 액션 제외)
   },
   {
     id: "ma8",
     title: "프로젝트 타임라인 화면 구현",
     projectTag: "COLLAB",
     status: ACTION_STATUS.TODO,
-    startDate: "2026-09-15",
-    dueDate: "2026-09-21", // D-47 (처리할 액션 제외)
+    startDate: clock.at("2026-09-15"),
+    dueDate: clock.at("2026-09-21"), // D-47 (처리할 액션 제외)
   },
 ];
 
@@ -91,7 +96,7 @@ export const MEMBER_ATTENDED_MEETINGS_MOCK: DashboardMeeting[] = [
     projectTag: "GOODS",
     status: MEETING_STATUS.DONE,
     room: "회의실 A",
-    scheduledAt: "2026-07-31T10:00:00",
+    scheduledAt: clock.at("2026-07-31T10:00:00"),
     attendeeCount: 3,
     originLabel: "개발팀",
     hostLabel: "김서준(팀장)",
@@ -102,7 +107,7 @@ export const MEMBER_ATTENDED_MEETINGS_MOCK: DashboardMeeting[] = [
     projectTag: "GOODS",
     status: MEETING_STATUS.DONE,
     room: "회의실 B",
-    scheduledAt: "2026-08-03T14:00:00",
+    scheduledAt: clock.at("2026-08-03T14:00:00"),
     attendeeCount: 3,
     originLabel: "개발팀",
     hostLabel: "김서준(팀장)",
@@ -113,7 +118,7 @@ export const MEMBER_ATTENDED_MEETINGS_MOCK: DashboardMeeting[] = [
     projectTag: "COLLAB",
     status: MEETING_STATUS.IN_PROGRESS,
     room: "회의실 A",
-    scheduledAt: "2026-08-05T11:00:00",
+    scheduledAt: clock.at("2026-08-05T11:00:00"),
     attendeeCount: 3,
     originLabel: "개발팀",
     hostLabel: "김서준(팀장)",
@@ -124,7 +129,7 @@ export const MEMBER_ATTENDED_MEETINGS_MOCK: DashboardMeeting[] = [
     projectTag: "GOODS",
     status: MEETING_STATUS.SCHEDULED,
     room: "회의실 C",
-    scheduledAt: "2026-08-08T15:00:00",
+    scheduledAt: clock.at("2026-08-08T15:00:00"),
     attendeeCount: 2,
     originLabel: "개발팀",
     hostLabel: "이하윤",
@@ -135,7 +140,7 @@ export const MEMBER_ATTENDED_MEETINGS_MOCK: DashboardMeeting[] = [
     projectTag: "COLLAB",
     status: MEETING_STATUS.SCHEDULED,
     room: "회의실 B",
-    scheduledAt: "2026-08-11T10:00:00",
+    scheduledAt: clock.at("2026-08-11T10:00:00"),
     attendeeCount: 2,
     originLabel: "개발팀",
     hostLabel: "박도현",

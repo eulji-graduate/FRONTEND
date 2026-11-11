@@ -3,10 +3,14 @@ import { addMockMeeting } from "@/features/meeting/mock/meetings";
 import type { MeetingDraft, MeetingTopic } from "@/features/meeting/types";
 import { TOP_LEVEL_PROJECTS } from "@/features/project/mock/projects";
 import { type Actor, requiresParentTeamAction } from "@/lib/permission";
+import { createMockClock } from "@/mocks/rebase-date";
 
 import { RESERVATION_DURATION_MINUTES } from "../constants";
 import type { RoomReservation, RoomReservationDraft } from "../types";
 import { findMockRoom } from "./rooms";
+
+/** 이 목이 "오늘"로 삼고 만든 날짜는 2026-08-06다 — 그날을 오늘로 옮긴다(`mocks/rebase-date.ts`). */
+const clock = createMockClock("2026-08-06", { alignWeek: true });
 
 /**
  * ⚠️ 목 데이터 — BE 연동 전. **서버 프로세스 메모리에만 있다**(재시작하면 초기값으로 되돌아간다).
@@ -20,7 +24,8 @@ interface ReservationStore {
 }
 
 /**
- * 오늘(2026-08-06)이 속한 주(월 8/3~금 8/7) 기준 시드.
+ * 오늘(2026-08-06, 목)이 속한 주(월 8/3~금 8/7) 기준 시드. **요일을 지켜** 오늘이 속한 주(월~금)로 옮긴다
+ * (`alignWeek` — 주간 달력이 월~금 구조라서, 오늘과의 간격은 최대 6일 어긋난다).
  * ⚠️ **회의는 예외 없이 30분 고정이다**(팀 확정, CLAUDE.md §브라우저 API) — 목 데이터도 이
  *    규칙을 그대로 지킨다. 90분·2시간짜리 목업을 두면 "30분 고정"이 화면에서부터 거짓말이 된다.
  * ⚠️ **프로젝트 태그는 전부 채워져 있다**(WORKFLOW.md §3-1 확정 — 프로젝트 없는 예약은 없다).
@@ -28,9 +33,9 @@ interface ReservationStore {
 const INITIAL: RoomReservation[] = [
   {
     id: "reservation-1",
-    title: "Q3 OKR 중간 점검",
-    start: new Date("2026-08-03T09:00:00"),
-    end: new Date("2026-08-03T09:30:00"),
+    title: "OKR 중간 점검",
+    start: clock.date("2026-08-03T09:00:00"),
+    end: clock.date("2026-08-03T09:30:00"),
     roomId: "room-small-b",
     roomName: "소회의실 B",
     projectId: "1",
@@ -42,8 +47,8 @@ const INITIAL: RoomReservation[] = [
   {
     id: "reservation-2",
     title: "마케팅 채널 전략 논의",
-    start: new Date("2026-08-03T10:00:00"),
-    end: new Date("2026-08-03T10:30:00"),
+    start: clock.date("2026-08-03T10:00:00"),
+    end: clock.date("2026-08-03T10:30:00"),
     roomId: "room-large",
     roomName: "대회의실",
     projectId: "2",
@@ -54,9 +59,9 @@ const INITIAL: RoomReservation[] = [
   },
   {
     id: "reservation-3",
-    title: "8월 제품 로드맵 검토",
-    start: new Date("2026-08-03T14:00:00"),
-    end: new Date("2026-08-03T14:30:00"),
+    title: "제품 로드맵 검토",
+    start: clock.date("2026-08-03T14:00:00"),
+    end: clock.date("2026-08-03T14:30:00"),
     roomId: "room-large",
     roomName: "대회의실",
     projectId: "1",
@@ -68,8 +73,8 @@ const INITIAL: RoomReservation[] = [
   {
     id: "reservation-4",
     title: "인프라 마이그레이션 리뷰",
-    start: new Date("2026-08-05T15:30:00"),
-    end: new Date("2026-08-05T16:00:00"),
+    start: clock.date("2026-08-05T15:30:00"),
+    end: clock.date("2026-08-05T16:00:00"),
     roomId: "room-small-a",
     roomName: "소회의실 A",
     projectId: "3",
@@ -81,8 +86,8 @@ const INITIAL: RoomReservation[] = [
   {
     id: "reservation-5",
     title: "팀 위클리 싱크",
-    start: new Date("2026-08-06T11:00:00"),
-    end: new Date("2026-08-06T11:30:00"),
+    start: clock.date("2026-08-06T11:00:00"),
+    end: clock.date("2026-08-06T11:30:00"),
     roomId: "room-video",
     roomName: "화상회의실",
     projectId: "3",

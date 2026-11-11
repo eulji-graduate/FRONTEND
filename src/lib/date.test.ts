@@ -1,5 +1,6 @@
 import {
   addDaysIso,
+  daysBetween,
   firstOfMonthIso,
   formatDate,
   formatDateWithYear,
@@ -9,6 +10,24 @@ import {
   formatYearMonthDay,
   isReadableDate,
 } from "./date";
+
+describe("daysBetween", () => {
+  it("to가 뒤면 양수, 앞이면 음수, 같으면 0이다", () => {
+    expect(daysBetween("2026-08-05", "2026-11-10")).toBe(97);
+    expect(daysBetween("2026-11-10", "2026-08-05")).toBe(-97);
+    expect(daysBetween("2026-11-10", "2026-11-10")).toBe(0);
+  });
+
+  it("달·해의 경계와 윤일을 센다", () => {
+    expect(daysBetween("2026-12-30", "2027-01-02")).toBe(3);
+    expect(daysBetween("2028-02-28", "2028-03-01")).toBe(2);
+  });
+
+  it("읽을 수 없는 날짜면 null이다", () => {
+    expect(daysBetween("2026-02-30", "2026-03-01")).toBeNull();
+    expect(daysBetween("2026-03-01", "내일")).toBeNull();
+  });
+});
 
 describe("addDaysIso", () => {
   it("일수를 더하고 뺀다", () => {

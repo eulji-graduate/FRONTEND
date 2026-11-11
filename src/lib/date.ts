@@ -93,7 +93,7 @@ export function firstOfMonthIso(iso: string, offsetMonths: number): string {
  * ⚠️ `new Date(iso)`로 파싱하지 않는다 — `"2026-05-03"`은 UTC 자정으로 읽혀 지역
  *    시간대에 따라 하루가 밀린다. 조각을 갈라 `Date.UTC`로만 센다.
  */
-function daysBetween(from: string, to: string): number | null {
+export function daysBetween(from: string, to: string): number | null {
   const a = parseIsoDate(from);
   const b = parseIsoDate(to);
   if (!a || !b) return null;
