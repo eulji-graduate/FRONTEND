@@ -30,23 +30,25 @@ app/
 │ ← 로그인 전. 기업 코드는 여기서만.
 ├─ (onboarding)/ /onboarding/1~3 · /payment · /done ← OWNER 초기설정 **4단계**(결제가 개통 관문)
 │
-├─ (authority)/ ← 같은 셸(사이드바 220px), 네비 항목만 권한별로 다름
-│ ├─ /owner **base role = Owner 전용** : 대시보드 · /owner/setting(기업설정)
-│ │ · /owner/leader-handovers(+/:id) — 팀장급 **오프보딩** 인수인계
-│ ├─ /manage **Owner ‖ is_admin — 관리 기능 전부가 여기 하나로** :
-│ │ /manage/members(+/:id) · /manage/members/new(계정발급, 사원 관리 화면 안 버튼으로 진입) · /manage/rooms
-│ │ · /manage/billing(구독·결제) · /manage/storage(저장소 관리)
-│ ├─ /team **base role = Leader**(본인 팀 스코프) : 대시보드 · /team/members(+/:id)
-│ │ · /team/action · /team/handover(+/:id)
-│ └─ /my **base role = Member** 대시보드
-│
-├─ (app)/ /app/* ← 공용 워크벤치(로그인 전원, 컴포넌트 레벨 권한 차등)
+├─ (shell)/ ← 로그인 뒤 같은 셸(사이드바 220px). 아래 둘이 이 레이아웃 하나를 나눠 쓴다
+│ ├─ (authority)/ ← 네비 항목만 권한별로 다름
+│ │ ├─ /owner **base role = Owner 전용** : 대시보드 · /owner/setting(기업설정)
+│ │ │ · /owner/leader-handovers(+/:id) — 팀장급 **오프보딩** 인수인계
+│ │ ├─ /manage **Owner ‖ is_admin — 관리 기능 전부가 여기 하나로** :
+│ │ │ /manage/members(+/:id, 계정 발급은 목록 안 모달 — 전용 라우트 없음) · /manage/rooms
+│ │ │ · /manage/billing(구독·결제) · /manage/storage(저장소 관리)
+│ │ ├─ /team **base role = Leader**(본인 팀 스코프) : 대시보드 · /team/members
+│ │ │ · /team/action · /team/handover(+/:id)
+│ │ └─ /my **base role = Member** 대시보드
+│ │
+│ └─ app/ /app/* ← 공용 워크벤치(로그인 전원, 컴포넌트 레벨 권한 차등)
 │ projects(+/new·/:projectId·/:projectId/team/:teamActionId) · actions/:id · my/actions
 │ · meeting(+/:id·/:id/capture·/:id/review) · rooms · board · calendar
-│ · notice(+/:id·/new·/:id/edit) · people · me · search · handover
+│ · notice(+/:id, 작성·수정은 모달) · people · me · search · handover
 │
 ├─ (gate)/ /subscription ← 구독이 끊긴 회사의 재개 화면
-└─ (system)/ /system/* ← 목업(더미), 향후 개선
+├─ (system)/ /system/* ← 목업(더미), 향후 개선
+└─ (dev)/ /design/* ← 개발용 디자인 확인 화면. 프로덕션 빌드에선 404
 
 - **기업 코드는 URL에 안 붙인다.** 기업 식별은 세션 쿠키(`companyId`). 코드는 로그인 전 화면(`/login`·`/register`)에만.
 - `(authority)` 4개는 **같은 셸(사이드바 220px)**, 네비만 권한별 → 레이아웃 1개 + 권한별 네비.
@@ -245,7 +247,8 @@ app/
 - [ ] **ERD·API 스펙** (BE 협의 전) — 값·정책은 **각 도메인 담당자의 문서**를 받아 맞춘다(§연동 검증)
 - [ ] **디자인 시안** — 화면 목록은 확정됐으나 시안은 미정
 - [ ] 프론트 3인 분업 (A 캡처 / B 실시간 / C 뷰 — 제안 상태)
-- [ ] 배포 = **AWS 확정, 서비스 미정**(Amplify/ECS/EC2). ⚠️ 정적 배포는 불가 — Server Action·BFF·SSE가 Node 서버를 요구한다 · 결제 실연동(Toss) 여부 · AI 실모델
+- [ ] 결제 실연동(Toss) 여부 · AI 실모델
+- [x] (확정 2026-11-01) **배포 안 함 — 로컬 전용**(`npm run dev`·`npm start`, `localhost:3000`). Docker·EC2 배포 워크플로는 삭제했다(#4). ⚠️ 그래도 Node 서버로 띄운다 — Server Action·BFF·SSE가 요구한다(`next export` 불가)
 - [ ] 온라인 회의 반영 시점
 - [ ] 모바일 대응 화면 선별 (디자인 확정 후)
 - [x] (확정) 스택=**Next.js App Router** · 스타일=Tailwind+shadcn/ui · **1440 기준 + 반응형 여지 확보** · 다크모드 전 페이지 · 기업 코드는 URL에 없음(세션)

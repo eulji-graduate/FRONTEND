@@ -46,13 +46,15 @@ src/
 ├─ app/
 │  ├─ (public)/       /  /login  /register  /plans
 │  ├─ (onboarding)/   /onboarding/*                  ← OWNER 초기설정
-│  ├─ (shell)/        (role)/ · (app)/               ← 사이드바 셸 하나를 공유한다
-│  │   ├─ (role)/     /owner  /manage  /team  /my    ← 역할 전용 대시보드·관리
-│  │   └─ (app)/      /app/*                         ← 공용 워크벤치(권한 차등)
+│  ├─ (shell)/        (authority)/ · app/            ← 사이드바 셸 하나를 공유한다
+│  │   ├─ (authority)/ /owner  /manage  /team  /my   ← 권한별 대시보드·관리
+│  │   └─ app/        /app/*                         ← 공용 워크벤치(권한 차등)
 │  ├─ (gate)/         /subscription                  ← 구독이 끊긴 회사의 재개 화면(셸 밖)
 │  ├─ (system)/       /system/*                      ← 확장(데모 제외)
-│  ├─ api/[...path]/  BFF 프록시
-│  └─ layout.tsx · globals.css · middleware.ts       ← ⚠️ 셸 담당 1인 단독 소유
+│  ├─ (dev)/          /design/*                      ← 개발용 확인 화면(프로덕션 404)
+│  ├─ api/            BFF 라우트 — 알림 SSE·자막 SSE·인수인계 PDF
+│  └─ layout.tsx · globals.css                       ← ⚠️ 셸 담당 1인 단독 소유
+├─ proxy.ts          문지기(옛 `middleware.ts`, Next 16에서 이름이 바뀌었다)
 ├─ features/<도메인>/  schemas · types · server · actions · components · *.test
 ├─ components/  ui/(shadcn 원자) · common/(공용 복합) · domain/
 ├─ hooks/  lib/  types/  constants/  styles/
@@ -61,7 +63,7 @@ src/
 
 **규칙**
 
-- `(role)` 하위 4개는 **같은 셸(사이드바 220px)** 을 쓰고 **네비 항목만 역할별로** 다르다 → 레이아웃 1개 + 역할별 네비 구성.
+- `(authority)` 하위 4개는 **같은 셸(사이드바 220px)** 을 쓰고 **네비 항목만 권한별로** 다르다 → 레이아웃 1개 + 권한별 네비 구성.
 - **관리 화면은 `/manage/*` 한 곳이다**(2026-08-05). 사원 관리·구독·결제는 대표와 Admin 겸직자가 같이 쓰므로
   역할 경로(`/owner/*`)에 두지 않는다 — 주소가 거짓말을 하게 된다. 판정은 `lib/permission.ts` 한 곳.
 - `/app/*`은 공용 화면에서 권한만 다르다 → 라우트를 쪼개지 말고 **컴포넌트 레벨 가드**.
@@ -319,14 +321,15 @@ export const isDelayed = (a: { status: ActionStatus; dueDate: string }) =>
 
 ---
 
-## 17. 배포 · 환경변수 · CI/CD
+## 17. 실행 · 환경변수 · CI
 
-- **환경변수:** `NEXT_PUBLIC_` = **빌드 시 번들에 박혀 브라우저 노출** → 시크릿 절대 금지. 값을 바꾸면 **재배포(재빌드)** 해야 반영된다.
-- **배포 전:** 로컬 `npm run build && npm start`로 프로덕션 검증. `package-lock.json` 커밋 필수.
-- **배포 = AWS**(서비스 미정 — Amplify / ECS·Fargate / EC2). `DECISIONS.md` 참고.
-  - ⚠️ **정적 배포(S3+CloudFront 단독)는 불가.** Server Action·BFF 프록시·httpOnly 쿠키·SSE가 **Node 서버**를 요구한다. `next export` 전제로 코드를 짜지 않는다.
-  - 컨테이너로 간다면 `next.config.ts`에 `output: 'standalone'`이 필요하다(Amplify는 불필요).
-  - ⚠️ **AWS 고유 값을 코드에 박지 않는다.** 리전·버킷·엔드포인트는 전부 환경변수로.
+- **환경변수:** `NEXT_PUBLIC_` = **빌드 시 번들에 박혀 브라우저 노출** → 시크릿 절대 금지. 값을 바꾸면 **dev 서버 재시작·재빌드**해야 반영된다.
+  - 견본은 `.env.example`(이름만, 값 없음) → `.env.local`로 복사해 채운다. 실제 값은 팀 채팅방으로 공유하고 **커밋하지 않는다**.
+  - ⚠️ 안 쓰는 변수는 빈 값(`X=`)으로 두지 말고 주석으로 둔다 — `??` 기본값이 빈 문자열을 못 거른다.
+- **배포 안 함 — 로컬 전용**(2026-11-01, `DECISIONS.md` §배포). 확인은 `npm run build && npm start`. `package-lock.json` 커밋 필수.
+  - ⚠️ **Node 서버로 띄운다.** Server Action·BFF 프록시·httpOnly 쿠키·SSE가 요구한다. `next export` 전제로 코드를 짜지 않는다.
+  - ⚠️ `output: 'standalone'`을 켜지 않는다 — `features/shell/routes.ts`가 실행 시점에 소스를 읽는다.
+  - ⚠️ **외부 주소를 코드 기본값으로 박지 않는다.** 서버 주소·키는 전부 환경변수로, 기본값은 `localhost`이거나 "없으면 끈다"다.
 - **CI:** GitHub Actions(`.github/workflows/ci.yml`). PR마다 `typecheck·lint·test·build` 4종이 `verify` 체크 하나로 묶여 돌고, 전부 통과해야 머지된다.
 
 ---
