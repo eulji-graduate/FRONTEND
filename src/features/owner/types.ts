@@ -18,6 +18,9 @@ export interface OwnerDashboardOverview {
   activeMemberCount: number;
   onLeaveMemberCount: number;
   leaderRows: OwnerDashboardLeaderRow[];
-  /** Owner 주최 프로젝트 회의만 (2절) — 팀 액션 회의는 여기 안 나온다. 개설 라벨은 "Owner" */
-  projectMeetings: DashboardMeeting[];
+  /**
+   * Owner 주최 프로젝트 회의만 (2절) — 팀 액션 회의는 여기 안 나온다. 개설 라벨은 "Owner"
+   * ⚠️ `null`은 **"못 불러왔다"**이지 "없다"가 아니다(#38, 팀장 대시보드와 같은 약속).
+   */
+  projectMeetings: DashboardMeeting[] | null;
 }
