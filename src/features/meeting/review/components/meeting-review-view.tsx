@@ -14,6 +14,7 @@ import {
 } from "@/constants/meeting";
 
 import { confirmActionDistributionAction } from "../actions";
+import { isMissingRequired } from "../lib";
 import type { AiActionDraft, ManualDraftInput, MeetingReviewInfo } from "../types";
 import { ActionReviewGroup } from "./action-review-group";
 import { ActionReviewRow } from "./action-review-row";
@@ -99,20 +100,18 @@ export function MeetingReviewView({ review }: MeetingReviewViewProps) {
     ? activeDrafts.some((draft) => draft.teamId === null)
     : activeDrafts.some((draft) => draft.assigneeId === null);
   /*
-    ⚠️ **필수 입력값(제목·세부내용·마감일) 누락 검사**(#622). BE는 입력 스키마 위반을
+    ⚠️ **필수 입력값(제목·마감일) 누락 검사**(#622). BE는 입력 스키마 위반을
        422로 튕기는데, 확정 다이얼로그가 뜬 뒤에 그걸 마주치면 사용자는 "다이얼로그까지
        왔는데 왜 실패?"로 인지 불일치가 생긴다. 다이얼로그 진입 전이 아니라 다이얼로그
        안에서 안내한다 — 확정 대상은 이 시점에 확정된 값(`activeDrafts`)이라 여기서 검사가
        가장 정확하다.
-    ⚠️ **`title`·`description`은 `trim()`으로 본다** — 공백만 있는 값은 BE도 빈 값 취급.
+    ⚠️ **`title`은 `trim()`으로 본다** — 공백만 있는 값은 BE도 빈 값 취급.
+    ⚠️ **세부 내용은 필수가 아니다**(#37). BE는 `detail`을 비워도 받는다(`ReviewDecisionRequest`·
+       `AddReviewActionRequest`에 필수 검사 없음) — 화면만 막고 있어서 AI가 세부 내용을 비워 둔
+       액션은 하나하나 채워야 확정됐다(민섭님 실서버 점검, 2026-11-12).
     ⚠️ **반려된 항목은 검사 대상이 아니다** — `activeDrafts`가 이미 걸렀다.
   */
-  const hasMissingRequired = activeDrafts.some(
-    (draft) =>
-      draft.title.trim().length === 0 ||
-      draft.description.trim().length === 0 ||
-      draft.dueDate.length === 0,
-  );
+  const hasMissingRequired = activeDrafts.some(isMissingRequired);
   function updateDraft(id: string, patch: Partial<AiActionDraft>) {
     setDrafts((prev) => prev.map((draft) => (draft.id === id ? { ...draft, ...patch } : draft)));
   }
@@ -445,7 +444,7 @@ export function MeetingReviewView({ review }: MeetingReviewViewProps) {
       <div className="flex items-center justify-end gap-3">
         {/*
           왜 잠겼는지 버튼 옆에서 말한다 — 눌리지 않는 버튼만 두면 고장으로 읽힌다(§정직성).
-          ⚠️ 필수 입력 누락이 우선순위가 더 높다(제목·설명·마감은 담당자보다 먼저 채워야 하는
+          ⚠️ 필수 입력 누락이 우선순위가 더 높다(제목·마감은 담당자보다 먼저 채워야 하는
              기본 필드) — 두 안내가 동시에 뜰 수는 있지만 하나만 뜰 상황에선 이쪽을 앞세운다.
           ⚠️ **버튼은 잠그지 않는다**(2026-08-20). 잠기면 "왜 안 눌리지" 하고 뭘 채워야 할지
              찾아 헤매게 된다 — 눌러 보면 비어 있는 필드가 즉시 빨갛게 강조되도록 승격한다.
@@ -453,7 +452,7 @@ export function MeetingReviewView({ review }: MeetingReviewViewProps) {
         */}
         {hasAttemptedConfirm && hasMissingRequired ? (
           <p className="text-destructive text-[12px] leading-4">
-            제목·세부 내용·마감일이 비어 있는 액션이 있습니다. 빨갛게 표시된 자리를 채워 주세요.
+            제목·마감일이 비어 있는 액션이 있습니다. 빨갛게 표시된 자리를 채워 주세요.
           </p>
         ) : hasUnassigned ? (
           <p className="text-muted-foreground text-[12px] leading-4">

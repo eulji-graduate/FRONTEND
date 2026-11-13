@@ -48,7 +48,7 @@ interface ActionReviewRowProps {
   onUnreject?: () => void;
   /**
    * 확정 시도 후 필수 필드 강조 여부. 부모(`MeetingReviewView`)가 [확정] 버튼을 눌러 검증
-   * 실패한 상태를 내려 주면 이 행 안의 제목·세부 내용·마감일 필드가 비어 있을 때 빨간
+   * 실패한 상태를 내려 주면 이 행 안의 제목·마감일 필드가 비어 있을 때 빨간
    * 테두리로 승격한다. 최초 진입에서는 회색 placeholder만 두고 확정 시도 뒤에야 강조한다.
    */
   hasAttemptedConfirm?: boolean;
@@ -84,7 +84,6 @@ export function ActionReviewRow({
   */
   const showInvalid = Boolean(hasAttemptedConfirm) && !isRejected;
   const invalidTitle = showInvalid && draft.title.trim().length === 0;
-  const invalidDescription = showInvalid && draft.description.trim().length === 0;
   const invalidDueDate = showInvalid && draft.dueDate.length === 0;
   return (
     <div
@@ -133,7 +132,6 @@ export function ActionReviewRow({
               placeholder="세부 내용을 입력해 주세요"
               multiline
               allowEmpty
-              isInvalid={invalidDescription}
             />
 
             {/*

@@ -1,4 +1,13 @@
-import type { AssigneeOption } from "./types";
+import type { AiActionDraft, AssigneeOption } from "./types";
+
+/**
+ * 확정 전에 꼭 채워야 하는 칸이 비었는지 — **제목·마감일**만 본다.
+ * ⚠️ 세부 내용은 보지 않는다(#37). BE가 `detail`을 비워도 받는다 — 화면만 막으면 AI가 비워 둔
+ *    액션을 하나하나 채워야 확정된다.
+ */
+export function isMissingRequired(draft: Pick<AiActionDraft, "title" | "dueDate">): boolean {
+  return draft.title.trim().length === 0 || draft.dueDate.length === 0;
+}
 
 /** "김서준 개발팀장"처럼 이름 뒤에 역할 라벨을 붙인다. 없으면 이름만. */
 export function formatAssigneeLabel(option: AssigneeOption): string {
