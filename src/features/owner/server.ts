@@ -1,6 +1,7 @@
 import type { MemberStatus } from "@/constants/domain";
 import { isVisibleMemberStatus } from "@/constants/member";
 import { requireAccessToken } from "@/features/auth/session";
+import { parseDashboardMeetings, toDashboardMeetingCard } from "@/features/meeting/mapper";
 import { serverApi } from "@/lib/api";
 import { ep } from "@/lib/endpoints";
 import { isMock } from "@/mocks/config";
@@ -56,23 +57,43 @@ function toOwnerDashboardLeaderRow(be: BeTeamLeaderStatus): OwnerDashboardLeader
   };
 }
 
+/**
+ * 최근 프로젝트 회의 — [확인] BE `DashboardMeetingController` `GET /api/meetings/dashboard?scope=owner`
+ * (MEET-17). 팀장 대시보드(`team/server.ts`)와 같은 응답·매퍼를 쓴다.
+ * ⚠️ 실패해도 대시보드 전체를 죽이지 않는다 — 이 카드만 "불러오지 못했습니다"가 된다(`null`).
+ */
+async function listRecentProjectMeetings(
+  accessToken: string,
+): Promise<OwnerDashboardOverview["projectMeetings"]> {
+  try {
+    const raw = await serverApi<unknown>(
+      ep.meetingsDashboard({ scope: "owner", limit: MEETING_MAX_ITEMS }),
+      { accessToken },
+    );
+    return parseDashboardMeetings(raw).map(toDashboardMeetingCard);
+  } catch {
+    return null;
+  }
+}
+
 export async function getOwnerDashboardOverview(): Promise<OwnerDashboardOverview> {
   if (isMock) {
     return {
       ...OWNER_DASHBOARD_MOCK,
       // 최신순(내림차순)으로 위에서부터 내려온다. 박스가 이 수에 딱 맞춰 그려지므로
       // (스크롤 없음) 서버도 같은 수로 자른다.
-      projectMeetings: [...OWNER_DASHBOARD_MOCK.projectMeetings]
+      projectMeetings: [...(OWNER_DASHBOARD_MOCK.projectMeetings ?? [])]
         .sort((a, b) => new Date(b.scheduledAt).getTime() - new Date(a.scheduledAt).getTime())
         .slice(0, MEETING_MAX_ITEMS),
     };
   }
 
   const accessToken = await requireAccessToken();
-  const [projectSummary, memberSummary, leaders] = await Promise.all([
+  const [projectSummary, memberSummary, leaders, projectMeetings] = await Promise.all([
     serverApi<BeProjectDashboardSummary>(ep.projectDashboardSummary(), { accessToken }),
     serverApi<BeMemberDashboardSummary>(ep.memberDashboardSummary(), { accessToken }),
     serverApi<BeTeamLeaderStatus[]>(ep.teamLeadersStatus(), { accessToken }),
+    listRecentProjectMeetings(accessToken),
   ]);
 
   return {
@@ -85,8 +106,7 @@ export async function getOwnerDashboardOverview(): Promise<OwnerDashboardOvervie
     leaderRows: leaders
       .filter((leader) => isVisibleMemberStatus(leader.status))
       .map(toOwnerDashboardLeaderRow),
-    // ⚠️ "최근 프로젝트 회의" API가 아직 BE에 없다(MEET-17, 모성진에게 요청함, 2026-08-12) —
-    //    지어내지 않고 빈 배열로 둔다(§정직성). API 도착하면 이 자리만 고친다.
-    projectMeetings: [],
+    // ⚠️ 예전엔 "API가 없다"며 빈 배열로 고정했다 — MEET-17이 생긴 뒤 연결을 빠뜨렸다(#38)
+    projectMeetings,
   };
 }

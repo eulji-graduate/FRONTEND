@@ -181,7 +181,15 @@ export default async function OwnerDashboardPage() {
               />
             </Link>
           </div>
-          {projectMeetings.length === 0 ? (
+          {/* ⚠️ 못 불러온 것과 없는 것을 가른다 — `null`에 "없습니다"라고 쓰면 없는 사실을 단정한다(#38) */}
+          {projectMeetings === null ? (
+            <EmptyState
+              className="flex-1"
+              icon={CalendarClock}
+              title="최근 프로젝트 회의를 불러오지 못했습니다."
+              description="잠시 뒤 새로고침해 주세요. 회의가 없는 것이 아니라 지금 목록을 받아오지 못한 것입니다."
+            />
+          ) : projectMeetings.length === 0 ? (
             <EmptyState
               className="flex-1"
               icon={CalendarClock}
